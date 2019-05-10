@@ -5,7 +5,7 @@ for different learning algorithms
 
 import numpy as np
 
-def loadTrainingData(path="./Dataset/dataset_v01.npz"):
+def loadTrainingData(path):
     """
     Loads the training data at the given path.
     Defalut will return a small example dataset of 10*5000 points
@@ -23,7 +23,7 @@ def loadTrainingData(path="./Dataset/dataset_v01.npz"):
     actions = data['constrained_torques']
     return observations, actions
 
-def unrollForDifferenceTraining(obs, actions):
+def unrollForDifferenceTraining(obs, actions, offset=0):
     """
     Returns vectors ready for training of a difference equation model. A
     difference equation model should predict targets[i, :] = model(inputs[i, :])
@@ -34,6 +34,9 @@ def unrollForDifferenceTraining(obs, actions):
                 containing the state trajectories of all rollouts
     actions:    array of shape nRollouts x nStepsPerRollout x nInputs
                 containing the state trajectories of all rollouts
+    offset:     int denoting the index (inclusive) from which the rollouts
+                will be taken into account; i.e, to discard the first part.
+                containing the state trajectories of all rollouts
     
     Returns
     ----------
@@ -42,6 +45,8 @@ def unrollForDifferenceTraining(obs, actions):
     inputs:     array of shape (nRollouts*nStepsPerRollout-1) x (nStates+nInputs)
                 states and actions concatenated.
     """
+    obs = obs[:, offset:, :]
+    actions = actions[:, offset:, :]
     targets = obs[:, 1:, :] - obs[:, :-1, :]
     targets = np.reshape(targets, [targets.shape[0]*targets.shape[1], targets.shape[2]])
 
@@ -50,4 +55,4 @@ def unrollForDifferenceTraining(obs, actions):
     
     inputs = np.concatenate([actionInputs, unrolledStates], axis=1)
 
-    return targets, inputs    
+    return targets, inputs
