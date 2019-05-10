@@ -56,3 +56,14 @@ def unrollForDifferenceTraining(obs, actions, offset=0):
     inputs = np.concatenate([actionInputs, unrolledStates], axis=1)
 
     return targets, inputs
+
+def subsampleTrainingSet(inputs, targets, nsamples):
+    """
+    Returns a random subset of the training data set given as input.
+    """
+    assert inputs.shape[0] == targets.shape[0]
+    n = inputs.shape[0]
+    assert nsamples <= n
+    permutation = np.random.permutation(n)[:nsamples]
+    return inputs[permutation], targets[permutation]
+
