@@ -35,7 +35,7 @@ class DynamicsLearnerInterface(object):
                                 the last action of "action_history".
         Outputs
         ----------
-        observation_future:     np-array of shape nSequences x nPredict+1 x nStates
+        observation_future:     np-array of shape nPredict+1 x nStates
                                 predicted states of the system. The last state
                                 will be one time step after the last action of
                                 action_future
