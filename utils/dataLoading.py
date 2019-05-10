@@ -5,9 +5,10 @@ for different learning algorithms
 
 import numpy as np
 
-def loadSmallTrainingData():
+def loadTrainingData(path="./Dataset/dataset_v01.npz"):
     """
-    Returns a small example dataset of 10*5000 points
+    Loads the training data at the given path.
+    Defalut will return a small example dataset of 10*5000 points
     
     Returns
     ----------
@@ -16,7 +17,7 @@ def loadSmallTrainingData():
     actions:    array of shape nRollouts x nStepsPerRollout x nInputs
                 containing the state trajectories of all rollouts
     """
-    data = np.load("./Dataset/dataset_v01.npz")
+    data = np.load(path)
     observations = np.concatenate((data['measured_angles'],
         data['measured_velocities'], data['measured_torques']), 2)
     actions = data['constrained_torques']
