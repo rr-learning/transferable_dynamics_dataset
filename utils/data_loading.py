@@ -5,11 +5,15 @@ for different learning algorithms
 
 import numpy as np
 
+
+from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerInterface
+
+
 def loadTrainingData(path):
     """
     Loads the training data at the given path.
     Defalut will return a small example dataset of 10*5000 points
-    
+
     Returns
     ----------
     obs:        array of shape nRollouts x nStepsPerRollout x nStates
@@ -27,7 +31,7 @@ def unrollForDifferenceTraining(obs, actions, offset=0):
     """
     Returns vectors ready for training of a difference equation model. A
     difference equation model should predict targets[i, :] = model(inputs[i, :])
-    
+
     Parameters
     ----------
     obs:        array of shape nRollouts x nStepsPerRollout x nStates
@@ -37,7 +41,7 @@ def unrollForDifferenceTraining(obs, actions, offset=0):
     offset:     int denoting the index (inclusive) from which the rollouts
                 will be taken into account; i.e, to discard the first part.
                 containing the state trajectories of all rollouts
-    
+
     Returns
     ----------
     targets:    array of shape nRollouts*(nStepsPerRollout-1) x nStates
@@ -52,7 +56,7 @@ def unrollForDifferenceTraining(obs, actions, offset=0):
 
     actionInputs = np.reshape(actions[:, :-1, :], [targets.shape[0], -1])
     unrolledStates = np.reshape(obs[:, :-1, :], [targets.shape[0], targets.shape[1]])
-    
+
     inputs = np.concatenate([actionInputs, unrolledStates], axis=1)
 
     return targets, inputs
@@ -67,3 +71,74 @@ def subsampleTrainingSet(inputs, targets, nsamples):
     permutation = np.random.permutation(n)[:nsamples]
     return inputs[permutation], targets[permutation]
 
+class DataProcessor(DynamicsLearnerInterface):
+    # Mix-in class to normalize inputs to train predict and (correspondingly) denormalize outputs of predict
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.eps = 1e-8
+        self.mean_states, self.std_states, self.mean_deltas, self.std_deltas, self.mean_acts, self.std_acts = [None] * 6
+
+    def learn(self, observation_sequences, action_sequences):
+        # delta_states = np.zeros_like(observation_sequences)
+        delta_states = observation_sequences[:, 1:, :] - observation_sequences[:, :-1, :]
+        action_sequences = action_sequences[:, :-1, :]
+        observation_sequences = observation_sequences[:,:-1,:]
+        states = observation_sequences.reshape((observation_sequences.shape[0] * observation_sequences.shape[1], observation_sequences.shape[2]))
+        delta_states = delta_states.reshape((delta_states.shape[0] * delta_states.shape[1], delta_states.shape[2]))
+        actions = action_sequences.reshape((action_sequences.shape[0] * action_sequences.shape[1], action_sequences.shape[2]))
+        #TODO: modify actions
+
+        norm_states, norm_actions, norm_deltas = self.normalize(states, actions, delta_states, override_statistics=True)
+
+        super().learn(norm_states, norm_actions, norm_deltas)
+
+    def predict(self, observation_history, action_history, action_future):
+        last_states = observation_history[-1, :].T
+        states = last_states
+        n_step_prediction = np.zeros((action_future.shape[0], observation_history.shape[1]))
+        for i, action in enumerate(action_future):
+            if states.ndim == 1:
+                states = states[None, ...]
+            if action.ndim == 1:
+                action = action[None, ...]
+            norm_states, norm_actions = self.normalize(states, action, override_statistics=False)
+            norm_deltas = super().predict(norm_states, norm_actions)
+            deltas = self.denormalize(norm_deltas)
+            next_states = states + deltas
+            n_step_prediction[i, :] = states + deltas
+            states = next_states
+        return n_step_prediction
+
+        return states + deltas
+
+    def normalize(self, states, actions, delta_states=None, override_statistics=False):
+        if override_statistics:
+            self.mean_states = np.mean(states, axis=0)
+            self.std_states = np.std(states, axis=0)
+            self.mean_acts = np.mean(actions, axis=0)
+            self.std_acts = np.std(actions, axis=0)
+        normalized_states = (states - self.mean_states) / (self.std_states + self.eps)
+        normalized_actions = (actions - self.mean_acts) / (self.std_acts + self.eps)
+
+        if delta_states is not None:
+            if override_statistics:
+                self.mean_deltas = np.mean(delta_states, axis=0)
+                self.std_deltas = np.std(delta_states, axis=0)
+            normalized_deltas = (delta_states - self.mean_deltas) / (self.std_deltas + self.eps)
+            return normalized_states, normalized_actions, normalized_deltas
+        else:
+            return normalized_states, normalized_actions
+
+    def denormalize(self, deltas):
+        return deltas * self.std_deltas + self.mean_deltas
+
+def connected_shuffle(list_arrays):
+    random_state = np.random.RandomState(0)
+    n_samples = list_arrays[0].shape[0]
+    numels = np.array([a.shape[0] for a in list_arrays])
+    if not np.all(numels == n_samples):
+        raise ValueError('Different number of elements along axis 0', numels, n_samples)
+    shuffling_indices = random_state.permutation(n_samples)
+    list_arrays = [a[shuffling_indices] for a in list_arrays]
+    return list_arrays

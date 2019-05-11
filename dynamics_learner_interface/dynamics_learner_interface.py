@@ -10,10 +10,10 @@ class DynamicsLearnerInterface(object):
         """
         Parameters
         ----------
-        observations_sequences: np-array of shape nSequences x nStepsPerRollout x nStates 
+        observations_sequences: np-array of shape nSequences x nStepsPerRollout x nStates
                                 past state observations
         action_sequences:       np-array of shape nSequences x nStepsPerRollout x nInputs
-                                actions taken at the corresponding time points.        
+                                actions taken at the corresponding time points.
         """
         raise NotImplementedError
 
@@ -24,7 +24,7 @@ class DynamicsLearnerInterface(object):
         observation_history:    np-array of shape nStepsPerRollout x nStates
                                 all states seen by the system in the current
                                 rollout
-        action_history:         np-array of shape nStepsPerRollout x nInputs 
+        action_history:         np-array of shape nStepsPerRollout x nInputs
                                 all actions seen by the system in the current
                                 rollout. The last action corresponds to the action
                                 that was applied at the final time step.
