@@ -42,6 +42,22 @@ class DynamicsLearnerInterface(object):
         """
         raise NotImplementedError
 
+    def load(self, filename):
+        """
+        Parameters
+        ----------
+        filename:   string used as filename to load a model.
+        """
+        raise NotImplementedError
+
+    def save(self, filename):
+        """
+        Parameters
+        ----------
+        filename:   string used as filename to save a model.
+        """
+        raise NotImplementedError
+
     def _check_learning_inputs(self, observation_sequences, action_sequences):
         assert observation_sequences.shape[:2] == action_sequences.shape[:2]
         assert observation_sequences.shape[2] == 9
