@@ -27,6 +27,14 @@ def loadTrainingData(path):
     actions = data['constrained_torques']
     return observations, actions
 
+def concatenateActionsStates(actions, states):
+    """
+    concatenates observations and actions to form a single matrix. This function
+    is intended to standardize the order observations and actions are merged to
+    form the dynamics input (i.e., first actions and then observations).
+    """
+    return np.hstack((actions, states))
+
 def unrollForDifferenceTraining(obs, actions, offset=0):
     """
     Returns vectors ready for training of a difference equation model. A
@@ -40,14 +48,13 @@ def unrollForDifferenceTraining(obs, actions, offset=0):
                 containing the state trajectories of all rollouts
     offset:     int denoting the index (inclusive) from which the rollouts
                 will be taken into account; i.e, to discard the first part.
-                containing the state trajectories of all rollouts
 
     Returns
     ----------
     targets:    array of shape nRollouts*(nStepsPerRollout-1) x nStates
                 state increment targets for training
     inputs:     array of shape (nRollouts*nStepsPerRollout-1) x (nStates+nInputs)
-                states and actions concatenated.
+                actions and states concatenated (in this order).
     """
     obs = obs[:, offset:, :]
     actions = actions[:, offset:, :]
@@ -57,7 +64,7 @@ def unrollForDifferenceTraining(obs, actions, offset=0):
     actionInputs = np.reshape(actions[:, :-1, :], [targets.shape[0], -1])
     unrolledStates = np.reshape(obs[:, :-1, :], [targets.shape[0], targets.shape[1]])
 
-    inputs = np.concatenate([actionInputs, unrolledStates], axis=1)
+    inputs = concatenateActionsStates(actionInputs, unrolledStates)
 
     return targets, inputs
 
