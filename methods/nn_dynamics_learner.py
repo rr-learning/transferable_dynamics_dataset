@@ -1,9 +1,12 @@
+import os
+import pickle
+
 import numpy as np
 from keras.layers import Dense
 from keras.models import Sequential
 from keras.optimizers import Adam, Adadelta, Adagrad, SGD, RMSprop
 import keras.backend as K
-
+from keras.models import load_model
 
 from DL import DynamicsLearnerInterface
 from DL.utils.data_loading import DataProcessor
@@ -11,17 +14,17 @@ from DL.utils.data_loading import connected_shuffle
 
 
 class NNDynamicsLearner(DynamicsLearnerInterface):
-    def __init__(self, model_arch_params, model_train_params):
+    def __init__(self, model_arch_params, model_train_params, mode ):
 
 
         self.input_dim = 12
         self.output_dim = 9
 
         self._parse_arch_params(**model_arch_params)
-        self._parse_train_params(**model_train_params)
-
-        self.model = Sequential()
-        self.build()
+        if mode == "train":
+            self._parse_train_params(**model_train_params)
+            self.model = Sequential()
+            self.build()
 
 
     def _parse_arch_params(self, num_layers, num_units, activation):
@@ -65,7 +68,20 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
 
 
 class NormalizedNNDynamicsLearner(DataProcessor, NNDynamicsLearner):
-    pass
+    def save(self, model_dir):
+         if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+         self.model.save(os.path.join(model_dir ,"keras_model.h5"))
+         normalization_stats = [self.mean_states, self.std_states, self.mean_deltas, self.std_deltas, self.mean_acts, self.std_acts]
+         with open(os.path.join(model_dir ,"normalization_stats.pickle"), 'wb') as handle:
+             pickle.dump(normalization_stats, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    def load(self, model_dir):
+         self.model = load_model(os.path.join(model_dir ,"keras_model.h5"))
+         normalization_stats = [self.mean_states, self.std_states, self.mean_deltas, self.std_deltas, self.mean_acts, self.std_acts]
+         with open(os.path.join(model_dir ,"normalization_stats.pickle"), 'rb') as handle:
+             normalization_stats = pickle.load(handle)
+         self.mean_states, self.std_states, self.mean_deltas, self.std_deltas, self.mean_acts, self.std_acts = normalization_stats
+
 
 
 def optimizer_from_string(opt_str):
