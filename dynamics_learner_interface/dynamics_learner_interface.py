@@ -69,8 +69,8 @@ class DynamicsLearnerInterface(object):
         assert action_history.shape[1] == 3
         assert action_future.shape[1] == 3
 
-    def _check_prediciton_outputs(self, action_future, observation_future):
-        assert action_future.shape[0] == observation_future.shape[0]
+    def _check_prediction_outputs(self, action_future, observation_future):
+        assert action_future.shape[0] + 1 == observation_future.shape[0]
         assert observation_future.shape[1] == 9
 
 
@@ -83,9 +83,10 @@ class DynamicsLearnerExample(DynamicsLearnerInterface):
 
         self._check_prediction_inputs(observation_history, action_history, action_future)
 
-        observation_future = np.zeros((action_future.shape[0], observation_history.shape[1]))
+        observation_future = np.zeros((action_future.shape[0] + 1,
+                observation_history.shape[1]))
 
-        self._check_prediciton_outputs(action_future, observation_future)
+        self._check_prediction_outputs(action_future, observation_future)
         return observation_future
 
 
