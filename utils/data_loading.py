@@ -9,10 +9,10 @@ import numpy as np
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerInterface
 
 
-def loadTrainingData(path):
+def loadRobotData(filename):
     """
-    Loads the training data at the given path.
-    Defalut will return a small example dataset of 10*5000 points
+    Loads Robot data at the given filename and returns it as a tuple of
+    observations and actions.
 
     Returns
     ----------
@@ -21,7 +21,7 @@ def loadTrainingData(path):
     actions:    array of shape nRollouts x nStepsPerRollout x nInputs
                 containing the state trajectories of all rollouts
     """
-    data = np.load(path)
+    data = np.load(filename)
     observations = np.concatenate((data['measured_angles'],
         data['measured_velocities'], data['measured_torques']), 2)
     actions = data['constrained_torques']
