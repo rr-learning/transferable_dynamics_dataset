@@ -26,50 +26,38 @@ def loadRobotData(filename):
     """
     data = np.load(filename)
     observations = np.concatenate((data['measured_angles'],
-        data['measured_velocities'], data['measured_torques']), 2)
+            data['measured_torques']), 2)
     actions = data['constrained_torques']
     return observations, actions
 
-def concatenateActionsStates(actions, states):
+def concatenateActionsStates(history_actions, history_obs, future_actions):
     """
-    concatenates observations and actions to form a single matrix. This function
+    concatenates observations and actions to form a single vector. This function
     is intended to standardize the order observations and actions are merged to
-    form the dynamics input (i.e., first actions and then observations).
+    form the dynamics input.
     """
-    return np.hstack((actions, states))
+    return np.concatenate((history_actions.flatten(), history_obs.flatten(),
+            future_actions.flatten()))
 
-def unrollForDifferenceTraining(obs, actions, offset=0):
-    """
-    Returns vectors ready for training of a difference equation model. A
-    difference equation model should predict targets[i, :] = model(inputs[i, :])
-
-    Parameters
-    ----------
-    obs:        array of shape nRollouts x nStepsPerRollout x nStates
-                containing the state trajectories of all rollouts
-    actions:    array of shape nRollouts x nStepsPerRollout x nInputs
-                containing the state trajectories of all rollouts
-    offset:     int denoting the index (inclusive) from which the rollouts
-                will be taken into account; i.e, to discard the first part.
-
-    Returns
-    ----------
-    targets:    array of shape nRollouts*(nStepsPerRollout-1) x nStates
-                state increment targets for training
-    inputs:     array of shape (nRollouts*nStepsPerRollout-1) x (nStates+nInputs)
-                actions and states concatenated (in this order).
-    """
-    obs = obs[:, offset:, :]
-    actions = actions[:, offset:, :]
-    targets = obs[:, 1:, :] - obs[:, :-1, :]
-    targets = np.reshape(targets, [targets.shape[0]*targets.shape[1], targets.shape[2]])
-
-    actionInputs = np.reshape(actions[:, :-1, :], [targets.shape[0], -1])
-    unrolledStates = np.reshape(obs[:, :-1, :], [targets.shape[0], targets.shape[1]])
-
-    inputs = concatenateActionsStates(actionInputs, unrolledStates)
-
-    return targets, inputs
+def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
+        difference_learning=True):
+    inputs = []
+    targets = []
+    for obs, act in zip(obs_seqs, actions_seqs):
+        length = obs.shape[0]
+        for offset in range(history_len, length - prediction_horizon + 1):
+            hist_obs = obs[offset - history_len:offset]
+            hist_act = act[offset - history_len:offset]
+            future_act = act[offset: offset + prediction_horizon - 1]
+            output_obs = obs[offset + prediction_horizon - 1]
+            current_input = concatenateActionsStates(hist_act, hist_obs,
+                    future_act)
+            current_target = output_obs
+            if difference_learning:
+                current_target -= hist_obs[-1]
+            inputs.append(current_input)
+            targets.append(current_target)
+    return np.vstack(targets), np.vstack(inputs)
 
 def subsampleTrainingSet(inputs, targets, nsamples):
     """

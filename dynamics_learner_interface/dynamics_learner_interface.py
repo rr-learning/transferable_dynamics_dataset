@@ -6,6 +6,10 @@ import traceback
 
 class DynamicsLearnerInterface(object):
 
+    def __init__(self, history_len, prediction_horizon):
+        self.history_len = history_len
+        self.prediction_horizon = prediction_horizon
+
     def learn(self, observation_sequences, action_sequences):
         """
         Parameters
@@ -21,24 +25,27 @@ class DynamicsLearnerInterface(object):
         """
         Parameters
         ----------
-        observation_history:    np-array of shape nStepsPerRollout x nStates
-                                all states seen by the system in the current
-                                rollout
-        action_history:         np-array of shape nStepsPerRollout x nInputs
-                                all actions seen by the system in the current
-                                rollout. The last action corresponds to the action
+        observation_history:    np-array of shape nPredictionTasks x
+                                self.history_len x nStates
+                                all states seen by the system.
+        action_history:         np-array of shape nPredictionTasks x
+                                self.history_len x nInputs
+                                all actions seen by the system.
+                                The last action corresponds to the action
                                 that was applied at the final time step.
-        action_future:          np-array of shape nPredict x nInputs
-                                actions to be applied to the system. First
-                                dimension determins prediction horizon. The first
+        action_future:          np-array of shape nPredictionTasks x
+                                self.prediction_horizon - 1 x nInputs
+                                actions to be applied to the system. The first
                                 action is the action applied one time step after
-                                the last action of "action_history".
+                                the last action of the corresponding
+                                "action_history".
         Outputs
         ----------
-        observation_future:     np-array of shape nPredict+1 x nStates
-                                predicted states of the system. The last state
-                                will be one time step after the last action of
-                                action_future
+        observation_future:     np-array with nStates dimensions corresponding
+                                to the state prediction for the particular
+                                prediction horizon. The predicted state will be
+                                one time step after the last action of the
+                                corresponding action_future.
         """
         raise NotImplementedError
 
@@ -63,12 +70,14 @@ class DynamicsLearnerInterface(object):
         assert observation_sequences.shape[2] == 9
         assert action_sequences.shape[2] == 3
 
+    # TODO: rewrite for the new interface.
     def _check_prediction_inputs(self, observation_history, action_history, action_future):
         assert observation_history.shape[0] == action_history.shape[0]
         assert observation_history.shape[1] == 9
         assert action_history.shape[1] == 3
         assert action_future.shape[1] == 3
 
+    # TODO: rewrite for the new interface.
     def _check_prediction_outputs(self, action_future, observation_future):
         assert action_future.shape[0] + 1 == observation_future.shape[0]
         assert observation_future.shape[1] == 9
