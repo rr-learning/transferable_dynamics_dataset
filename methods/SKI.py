@@ -1,108 +1,160 @@
 # -*- coding: utf-8 -*-
-
-
 import math
 import torch
 import gpytorch
 from matplotlib import pyplot as plt
 
+DTYPE=torch.float
 
 import argparse
 import numpy as np
-from dynamics_learner_interface import DynamicsLearnerInterface
+from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerInterface
+from DL.utils.data_loading import unrollForDifferenceTraining
 
-
-
+from DL.utils.standardizer import Standardizer
 
 class SKIDynamicsLearner(DynamicsLearnerInterface):
 
     def __init__(self, state_dims, action_dims, learningRate=0.1,
-                 trainingIterations=1000):
+                 trainingIterations=100):
         self.learningRate=learningRate
         self.state_dims = state_dims
         self.action_dims = action_dims
-        self.model = None
+        self.models = None
+        self.trainingIterations = trainingIterations
 
-    def setAdam(learningRate=0.1):
+    def setAdam(self, currModel, learningRate=0.1):
         self.optimizer = torch.optim.Adam(
-                [{'params': self.model.parameters()}],
+                [{'params': currModel.parameters()}],
                 lr=learningRate)
 
-
     def learn(self, observation_sequences, action_sequences):
-        # get data and order them correctly
-        X, Y = self.get_training_data_from_multiple_rollouts(
-                observation_sequences, action_sequences)        
-        # create model
-        self.model = GPRegressionModel(X, Y)
-        # set model into training mode
-        self.model.train()
-        self.model.likelihood.train()
-        # initialize optimizer and optimization target
-        self.setAdam(self.learningRate)
-        mll = gpytorch.mlls.ExactMarginalLogLikelihood(
-                self.likelihood,
-                self.model)
-        # do training
-        for i in range(self.trainingIterations):
-            self.optimizer.zero_grad()
-            output = self.model(X)
-            loss = -mll(output, Y)
-            loss.backward()
-            print('Iter %d/%d - Loss: %.3f' % (i + 1, self.training_iterations, loss.item()))
-            optimizer.step()
-        # TODO: maybe include smarter optimizer or optimization criteria
-        
+        """
+        Parameters
+        ----------
+        observations_sequences: np-array of shape nSequences x nStepsPerRollout x nStates 
+                                past state observations
+        action_sequences:       np-array of shape nSequences x nStepsPerRollout x nInputs
+                                actions taken at the corresponding time points.        
+        """
+        targets, inputs = unrollForDifferenceTraining(observation_sequences, action_sequences)
+        targets = np.asarray(targets, dtype=np.double)
+        inputs = np.asarray(inputs, dtype=np.double)
+        # standardize everything
+        self.targetStandardizer = Standardizer(targets)
+        self.inputStandardizer = Standardizer(inputs)
+        targets = self.targetStandardizer.standardize(targets)
+        inputs = self.inputStandardizer.standardize(inputs)
+        targets = torch.from_numpy(targets).float()
+        inputs = torch.from_numpy(inputs).float()
+
+        self.models = []
+        for modelIndex in np.arange(targets.shape[1]):
+            print(modelIndex)
+            # create model
+            currModel = GPRegressionModel(inputs, targets[:, modelIndex])
+            # set model into training mode
+            currModel.train()
+            currModel.likelihood.train()
+            # initialize optimizer and optimization target
+            self.setAdam(currModel, self.learningRate)
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(
+                    currModel.likelihood,
+                    currModel)
+            # do training
+            for iterIndex in range(self.trainingIterations):
+                self.optimizer.zero_grad()
+                output = currModel(inputs)
+                loss = -mll(output, targets[:, modelIndex])
+                loss.backward()
+                print('Iter %d/%d - Loss: %.3f' % (iterIndex + 1, self.trainingIterations, loss.item()))
+                self.optimizer.step()
+            self.models.append(currModel) 
+
+    def learn2(self, inputs, targets):
+        """
+        Parameters
+        ----------
+        observations_sequences: np-array of shape nSequences x nStepsPerRollout x nStates 
+                                past state observations
+        action_sequences:       np-array of shape nSequences x nStepsPerRollout x nInputs
+                                actions taken at the corresponding time points.        
+        """
+#        targets, inputs = unrollForDifferenceTraining(observation_sequences, action_sequences)
+#        targets = np.asarray(targets, dtype=np.double)
+#        inputs = np.asarray(inputs, dtype=np.double)
+#        # standardize everything
+#        self.targetStandardizer = Standardizer(targets)
+#        self.inputStandardizer = Standardizer(inputs)
+#        targets = self.targetStandardizer.standardize(targets)
+#        inputs = self.inputStandardizer.standardize(inputs)
+#        targets = torch.tensor(targets, dtype=DTYPE)
+#        inputs = torch.tensor(inputs, dtype=DTYPE)
+
+        self.models = []
+        for modelIndex in np.arange(targets.shape[1]):
+            print(modelIndex)
+            # create model
+            currModel = GPRegressionModel(inputs, targets[:, modelIndex])
+            # set model into training mode
+            currModel.train()
+            currModel.likelihood.train()
+            # initialize optimizer and optimization target
+            self.setAdam(currModel, self.learningRate)
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(
+                    currModel.likelihood,
+                    currModel)
+            # do training
+            for iterIndex in range(self.trainingIterations):
+                self.optimizer.zero_grad()
+                output = currModel(inputs)
+                loss = -mll(output, targets[:, modelIndex])
+                loss.backward()
+                print('Iter %d/%d - Loss: %.3f' % (iterIndex + 1, self.trainingIterations, loss.item()))
+                self.optimizer.step()
+            self.models.append(currModel)    
+      
     def predict(self, observation_history, action_history, action_future):
+        """
+        Parameters
+        ----------
+        observation_history:    np-array of shape nStepsPerRollout x nStates
+                                all states seen by the system in the current
+                                rollout
+        action_history:         np-array of shape nStepsPerRollout x nInputs 
+                                all actions seen by the system in the current
+                                rollout. The last action corresponds to the action
+                                that was applied at the final time step.
+        action_future:          np-array of shape nPredict x nInputs
+                                actions to be applied to the system. First
+                                dimension determins prediction horizon. The first
+                                action is the action applied one time step after
+                                the last action of "action_history".
+        Outputs
+        ----------
+        observation_future:     np-array of shape nPredict+1 x nStates
+                                predicted states of the system. The last state
+                                will be one time step after the last action of
+                                action_future
+        """
+        # Set model and likelihood into evaluation mode
+        self.model.eval()
+        self.likelihood.eval()
 
+        x0 = observation_history[-1, :]
+        a0 = np.asarray(action_history[-1, :]).reshape([1, -1])
+        allActions = np.concatenate([a0, action_future], axis=0)
 
-# Set model and likelihood into evaluation mode
-model.eval()
-likelihood.eval()
+        observation_future = np.zeros(allActions.shape[0]+1, x0.size)
+        observation_future[0, :] = x0
 
-# Generate nxn grid of test points spaced on a grid of size 1/(n-1) in [0,1]x[0,1]
-n = 10
-test_x = torch.zeros(int(pow(n, 2)), 2)
-for i in range(n):
-    for j in range(n):
-        test_x[i * n + j][0] = float(i) / (n-1)
-        test_x[i * n + j][1] = float(j) / (n-1)
-
-with torch.no_grad(), gpytorch.settings.fast_pred_var():
-    observed_pred = likelihood(model(test_x))
-    pred_labels = observed_pred.mean.view(n, n)
-
-# Calc abosolute error
-test_y_actual = torch.sin(((test_x[:, 0] + test_x[:, 1]) * (2 * math.pi))).view(n, n)
-delta_y = torch.abs(pred_labels - test_y_actual).detach().numpy()
-
-# Define a plotting function
-def ax_plot(f, ax, y_labels, title):
-    im = ax.imshow(y_labels)
-    ax.set_title(title)
-    f.colorbar(im)
-
-# Plot our predictive means
-f, observed_ax = plt.subplots(1, 1, figsize=(4, 3))
-ax_plot(f, observed_ax, pred_labels, 'Predicted Values (Likelihood)')
-
-# Plot the true values
-f, observed_ax2 = plt.subplots(1, 1, figsize=(4, 3))
-ax_plot(f, observed_ax2, test_y_actual, 'Actual Values (Likelihood)')
-
-# Plot the absolute errors
-f, observed_ax3 = plt.subplots(1, 1, figsize=(4, 3))
-ax_plot(f, observed_ax3, delta_y, 'Absolute Error Surface')
-
-
-
-
-
-
-
-" JUST CREATING DATA"
-# train_x : tensor() nObs x nDim torch.Size([1600, 2])
-# train_y : tensor() nObs torch.Size([1600])
+        for i in np.arange(allActions.shape[0]):
+            with torch.no_grad(), gpytorch.settings.fast_pred_var():
+                observed_pred = self.likelihood(self.model(allActions[i, :]))
+                currentPrediction = observed_pred.mean # .view(n, n)
+            observation_future[i+1, :] = observation_future[i, :] + currentPrediction
+        
+        return observation_future[1:, :]
 
 
 class GPRegressionModel(gpytorch.models.ExactGP):
@@ -115,7 +167,9 @@ class GPRegressionModel(gpytorch.models.ExactGP):
         super(GPRegressionModel, self).__init__(train_x, train_y, likelihood)
 
         # SKI requires a grid size hyperparameter. This util can help with that
-        grid_size = gpytorch.utils.grid.choose_grid_size(train_x)
+#        grid_size = gpytorch.utils.grid.choose_grid_size(train_x)
+#        print("grid size {}".format(grid_size))
+        grid_size = 40 # TODO: MAGIC NUMBER !!!
 
         self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = gpytorch.kernels.GridInterpolationKernel(
