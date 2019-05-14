@@ -2,6 +2,9 @@
 basic helper functions to load the data set and get it in the right format
 for different learning algorithms
 """
+import os
+import pickle
+
 
 import numpy as np
 
@@ -139,6 +142,20 @@ class DataProcessor(DynamicsLearnerInterface):
 
     def denormalize(self, deltas):
         return deltas * self.std_deltas + self.mean_deltas
+
+    def save(self, model_dir):
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+        normalization_stats = [self.mean_states, self.std_states, self.mean_deltas, self.std_deltas, self.mean_acts, self.std_acts]
+        with open(os.path.join(model_dir ,"normalization_stats.pickle"), 'wb') as handle:
+            pickle.dump(normalization_stats, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        super().save(model_dir)
+
+    def load(self, model_dir):
+         with open(os.path.join(model_dir ,"normalization_stats.pickle"), 'rb') as handle:
+             normalization_stats = pickle.load(handle)
+         self.mean_states, self.std_states, self.mean_deltas, self.std_deltas, self.mean_acts, self.std_acts = normalization_stats
+         super().load(model_dir)
 
 def connected_shuffle(list_arrays):
     random_state = np.random.RandomState(0)
