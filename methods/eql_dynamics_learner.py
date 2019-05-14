@@ -5,6 +5,7 @@ import tensorflow as tf
 import sys
 import os
 import glob
+import pickle
 from collections import namedtuple, defaultdict, OrderedDict
 from sympy.utilities.lambdify import lambdify
 
@@ -78,7 +79,6 @@ class EQL(DynamicsLearnerInterface):
         self.train_val_split = train_val_split
         self.model_dir = model_dir
 
-
     def learn(self, states, actions, deltas):
         states_and_acts = np.concatenate((states, actions), axis=1)
         inputs, outputs = connected_shuffle([states_and_acts, deltas])
@@ -92,9 +92,9 @@ class EQL(DynamicsLearnerInterface):
         for i, reg_scale in enumerate(self.reg_scales):
             print('Regularizing with scale %s' % str(reg_scale))
             self.model_fn.set_reg_scale(reg_scale)
-            if i == 0 :
+            if i == 0:
                 max_episode = self.epochs_first_reg // self.evaluate_every
-            else :
+            else:
                 max_episode = self.epochs_per_reg // self.evaluate_every
             for train_episode in range(1, max_episode + 1):
                 print('Regularized train episode with scale %s: %d out of %d.' % (str(reg_scale), train_episode, max_episode))
@@ -103,14 +103,15 @@ class EQL(DynamicsLearnerInterface):
                 if (i == 0) and (val_results['eval_accuracy'] > self.params['val_acc_thresh']):
                     print('Reached accuracy of %d, starting regularization.' % val_results['eval_accuracy'])
                     break
-
             self.results = evaluate_learner(learner=self.estimator,
                                             res=self.results,
                                             eval_hook=self.model_fn.evaluation_hook,
                                             val_input=val_input,
                                             test_input=None,
                                             reg_scale=reg_scale)
-            self.is_trained = True
+        self.is_trained = True
+        _ = [func for func in dir(self.model_fn) if callable(getattr(self.model_fn, func))]
+        self.model_fn.generate_symbolic_expression(3)
 
     def predict(self, states, actions):
         if states.ndim == 1:
@@ -118,9 +119,25 @@ class EQL(DynamicsLearnerInterface):
         if actions.ndim == 1:
             actions = actions[None, ...]
         inputs = np.concatenate((states, actions), axis=1)
-        prediction = self.model_fn.evaluation_hook.numba_expr(*(inputs.T))
+
+        prediction = self.model_fn.numba_expr(*(inputs.T))
         prediction = np.asarray(prediction).T
         return prediction
+
+    def save(self, model_dir):
+        self.model_fn.generate_symbolic_expression(3)
+        exprs = [self.model_fn.sympy_expr, self.model_fn.numba_expr]
+
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+        with open(os.path.join(model_dir, "exprs.pickle"), 'wb') as handle:
+            pickle.dump(exprs, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load(self, model_dir):
+        with open(os.path.join(model_dir, "exprs.pickle"), 'rb') as handle:
+            exprs = pickle.load(handle)
+        self.model_fn.sympy_expr, self.model_fn.numba_expr = exprs
+
 
 class NormalizedEQL(DataProcessor, EQL):
     pass
