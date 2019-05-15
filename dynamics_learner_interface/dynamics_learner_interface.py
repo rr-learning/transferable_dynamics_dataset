@@ -12,7 +12,43 @@ class DynamicsLearnerInterface(object):
         self.observation_dimension = 9
         self.action_dimension = 3
 
+    # do not override this function!
     def learn(self, observation_sequences, action_sequences):
+        self._check_learning_inputs(observation_sequences, action_sequences)
+        self._learn(observation_sequences, action_sequences)
+
+    # do not override this function!
+    def predict(self, observation_history, action_history, action_future=None):
+        self._check_prediction_inputs(observation_history, action_history, action_future)
+        observation_prediction = self._predict(observation_history, action_history, action_future)
+        self._check_prediction_outputs(observation_history, observation_prediction)
+        return observation_prediction
+
+    # do not override this function!
+    def predict_recursively(self, observation_history, action_history, action_future):
+        assert self.prediction_horizon == 1
+        assert observation_history.shape[1] == self.history_length
+        assert action_history.shape[1] == self.history_length
+
+        observation_history_t = observation_history
+        action_history_t = action_history
+        predicted_observation = self.predict(observation_history_t, action_history_t)
+
+        for t in xrange(action_future.shape[1]):
+            predicted_observation = np.expand_dims(predicted_observation, axis=1)
+            observation_history_t = np.append(observation_history_t[:, 1:], predicted_observation, axis=1)
+            action_history_t = np.append(action_history_t[:, 1:], action_future[:, t:t + 1], axis=1)
+            predicted_observation = self.predict(observation_history_t, action_history_t)
+
+            assert (action_history_t[:, :-(t + 1)] == action_history[:, t + 1:]).all()
+            assert (observation_history_t[:, :-(t + 1)] == observation_history[:, t + 1:]).all()
+            assert (action_history_t[:, -1] == action_future[:, t]).all()
+            assert (observation_history_t[:, -1] == predicted_observation).all()
+
+        return predicted_observation
+
+    # override this function
+    def _learn(self, observation_sequences, action_sequences):
         """
         Parameters
         ----------
@@ -23,7 +59,8 @@ class DynamicsLearnerInterface(object):
         """
         raise NotImplementedError
 
-    def predict(self, observation_history, action_history, action_future=None):
+    # override this function
+    def _predict(self, observation_history, action_history, action_future):
         """
         Parameters
         ----------
@@ -46,22 +83,6 @@ class DynamicsLearnerInterface(object):
 
         """
         raise NotImplementedError
-
-    # def load(self, filename):
-    #     """
-    #     Parameters
-    #     ----------
-    #     filename:   string used as filename to load a model.
-    #     """
-    #     raise NotImplementedError
-    #
-    # def save(self, filename):
-    #     """
-    #     Parameters
-    #     ----------
-    #     filename:   string used as filename to save a model.
-    #     """
-    #     raise NotImplementedError
 
     def _check_learning_inputs(self, observation_sequences, action_sequences):
         assert observation_sequences.shape[:2] == action_sequences.shape[:2]
@@ -95,22 +116,17 @@ class DynamicsLearnerInterface(object):
 
 class DynamicsLearnerExample(DynamicsLearnerInterface):
 
-    def learn(self, observation_sequences, action_sequences):
-        self._check_learning_inputs(observation_sequences, action_sequences)
+    def _learn(self, observation_sequences, action_sequences):
+        pass
 
-    def predict(self, observation_history, action_history, action_future):
-        self._check_prediction_inputs(observation_history, action_history, action_future)
-
-        observation_prediction = observation_history[:, -1, :]
-
-        self._check_prediction_outputs(observation_history, observation_prediction)
-        return observation_prediction
+    def _predict(self, observation_history, action_history, action_future):
+        return observation_history[:, -1, :]
 
 
 if __name__ == '__main__':
     try:
 
-        data = np.load('./Dataset/dataset_v01.npz')
+        data = np.load('../../Dataset/dataset_v01.npz')
 
         observation_sequences = np.concatenate((data['measured_angles'],
                                                 data['measured_velocities'],
@@ -129,7 +145,7 @@ if __name__ == '__main__':
                                                                                              + prediction_horizon - 1])
 
         rms = np.linalg.norm(observation_sequences[:, history_length + prediction_horizon - 1] -
-                                       observation_prediction)
+                             observation_prediction)
         print('rms: ', rms)
 
         ipdb.set_trace()
