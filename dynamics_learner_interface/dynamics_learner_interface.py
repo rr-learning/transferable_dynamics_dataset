@@ -19,6 +19,11 @@ class DynamicsLearnerInterface(object):
 
     # do not override this function!
     def predict(self, observation_history, action_history, action_future=None):
+        if action_future is None:
+            assert self.prediction_horizon == 1
+            action_future = np.empty((observation_history.shape[0],
+                                      0,
+                                      self.action_dimension))
         self._check_prediction_inputs(observation_history, action_history, action_future)
         observation_prediction = self._predict(observation_history, action_history, action_future)
         self._check_prediction_outputs(observation_history, observation_prediction)
@@ -104,12 +109,9 @@ class DynamicsLearnerInterface(object):
                                         self.history_length,
                                         self.action_dimension)
 
-        if self.prediction_horizon == 1:
-            assert action_future is None
-        else:
-            assert action_future.shape == (n_samples,
-                                           self.prediction_horizon - 1,
-                                           self.action_dimension)
+        assert action_future.shape == (n_samples,
+                                       self.prediction_horizon - 1,
+                                       self.action_dimension)
 
     def _check_prediction_outputs(self, observation_history, observation_prediction):
         n_samples = observation_history.shape[0]
@@ -119,6 +121,9 @@ class DynamicsLearnerInterface(object):
 
 
 class DynamicsLearnerExample(DynamicsLearnerInterface):
+
+    def name(self):
+        return 'dynamics_learner_example'
 
     def _learn(self, observation_sequences, action_sequences):
         pass
