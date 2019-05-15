@@ -6,81 +6,91 @@ import traceback
 
 class DynamicsLearnerInterface(object):
 
-    def __init__(self, history_len, prediction_horizon):
-        self.history_len = history_len
+    def __init__(self, history_length, prediction_horizon):
+        self.history_length = history_length
         self.prediction_horizon = prediction_horizon
+        self.observation_dimension = 9
+        self.action_dimension = 3
 
     def learn(self, observation_sequences, action_sequences):
         """
         Parameters
         ----------
-        observations_sequences: np-array of shape nSequences x nStepsPerRollout x nStates
+        observation_sequences:  np-array of shape nSequences x nStepsPerRollout x observation_dimension
                                 past state observations
-        action_sequences:       np-array of shape nSequences x nStepsPerRollout x nInputs
+        action_sequences:       np-array of shape nSequences x nStepsPerRollout x action_dimension
                                 actions taken at the corresponding time points.
         """
         raise NotImplementedError
 
-    def predict(self, observation_history, action_history, action_future):
+    def predict(self, observation_history, action_history, action_future=None):
         """
         Parameters
         ----------
-        observation_history:    np-array of shape nPredictionTasks x
-                                self.history_len x nStates
-                                all states seen by the system.
-        action_history:         np-array of shape nPredictionTasks x
-                                self.history_len x nInputs
-                                all actions seen by the system.
-                                The last action corresponds to the action
-                                that was applied at the final time step.
-        action_future:          np-array of shape nPredictionTasks x
-                                self.prediction_horizon - 1 x nInputs
+        observation_history:    np-array of shape n_samples x
+                                self.history_length x observation_dimension
+        action_history:         np-array of shape n_samples x
+                                self.history_length x action_dimension
+        action_future:          np-array of shape n_samples x
+                                self.prediction_horizon - 1 x action_dimension
                                 actions to be applied to the system. The first
                                 action is the action applied one time step after
                                 the last action of the corresponding
                                 "action_history".
         Outputs
         ----------
-        observation_future:     np-array with nStates dimensions corresponding
-                                to the state prediction for the particular
-                                prediction horizon. The predicted state will be
-                                one time step after the last action of the
-                                corresponding action_future.
+        observation_prediction: np-array of shape n_samples x observation_dimension
+                                corresponding the prediction for the observation
+                                prediction_horizon steps after the last observation
+                                of observation_history
+
         """
         raise NotImplementedError
 
-    def load(self, filename):
-        """
-        Parameters
-        ----------
-        filename:   string used as filename to load a model.
-        """
-        raise NotImplementedError
-
-    def save(self, filename):
-        """
-        Parameters
-        ----------
-        filename:   string used as filename to save a model.
-        """
-        raise NotImplementedError
+    # def load(self, filename):
+    #     """
+    #     Parameters
+    #     ----------
+    #     filename:   string used as filename to load a model.
+    #     """
+    #     raise NotImplementedError
+    #
+    # def save(self, filename):
+    #     """
+    #     Parameters
+    #     ----------
+    #     filename:   string used as filename to save a model.
+    #     """
+    #     raise NotImplementedError
 
     def _check_learning_inputs(self, observation_sequences, action_sequences):
         assert observation_sequences.shape[:2] == action_sequences.shape[:2]
-        assert observation_sequences.shape[2] == 9
-        assert action_sequences.shape[2] == 3
+        assert observation_sequences.shape[2] == self.observation_dimension
+        assert action_sequences.shape[2] == self.action_dimension
 
-    # TODO: rewrite for the new interface.
     def _check_prediction_inputs(self, observation_history, action_history, action_future):
-        assert observation_history.shape[0] == action_history.shape[0]
-        assert observation_history.shape[1] == 9
-        assert action_history.shape[1] == 3
-        assert action_future.shape[1] == 3
+        n_samples = observation_history.shape[0]
 
-    # TODO: rewrite for the new interface.
-    def _check_prediction_outputs(self, action_future, observation_future):
-        assert action_future.shape[0] + 1 == observation_future.shape[0]
-        assert observation_future.shape[1] == 9
+        assert observation_history.shape == (n_samples,
+                                             self.history_length,
+                                             self.observation_dimension)
+
+        assert action_history.shape == (n_samples,
+                                        self.history_length,
+                                        self.action_dimension)
+
+        if self.prediction_horizon == 1:
+            assert action_future is None
+        else:
+            assert action_future.shape == (n_samples,
+                                           self.prediction_horizon - 1,
+                                           self.action_dimension)
+
+    def _check_prediction_outputs(self, observation_history, observation_prediction):
+        n_samples = observation_history.shape[0]
+
+        assert observation_prediction.shape == (n_samples,
+                                                self.observation_dimension)
 
 
 class DynamicsLearnerExample(DynamicsLearnerInterface):
@@ -89,20 +99,18 @@ class DynamicsLearnerExample(DynamicsLearnerInterface):
         self._check_learning_inputs(observation_sequences, action_sequences)
 
     def predict(self, observation_history, action_history, action_future):
-
         self._check_prediction_inputs(observation_history, action_history, action_future)
 
-        observation_future = np.zeros((action_future.shape[0] + 1,
-                observation_history.shape[1]))
+        observation_prediction = observation_history[:, -1, :]
 
-        self._check_prediction_outputs(action_future, observation_future)
-        return observation_future
+        self._check_prediction_outputs(observation_history, observation_prediction)
+        return observation_prediction
 
 
 if __name__ == '__main__':
     try:
 
-        data = np.load('../../Dataset/dataset_v01.npz')
+        data = np.load('./Dataset/dataset_v01.npz')
 
         observation_sequences = np.concatenate((data['measured_angles'],
                                                 data['measured_velocities'],
@@ -110,15 +118,19 @@ if __name__ == '__main__':
 
         action_sequences = data['constrained_torques']
 
-        dynamics_learner = DynamicsLearnerExample()
+        history_length = 10
+        prediction_horizon = 100
+        dynamics_learner = DynamicsLearnerExample(history_length, prediction_horizon)
         dynamics_learner.learn(observation_sequences, action_sequences)
 
-        observation_future = dynamics_learner.predict(observation_sequences[0, :10],
-                                                      action_sequences[0, :10],
-                                                      action_sequences[0, 10:15])
+        observation_prediction = dynamics_learner.predict(observation_sequences[:, :history_length],
+                                                          action_sequences[:, :history_length],
+                                                          action_sequences[:, history_length:history_length
+                                                                                             + prediction_horizon - 1])
 
-        squared_error = np.linalg.norm(observation_sequences[0, 14] - observation_future[4])
-        print('squared error: ', squared_error)
+        rms = np.linalg.norm(observation_sequences[:, history_length + prediction_horizon - 1] -
+                                       observation_prediction)
+        print('rms: ', rms)
 
         ipdb.set_trace()
 
