@@ -48,6 +48,10 @@ class DynamicsLearnerInterface(object):
         return predicted_observation
 
     # override this function
+    def name(self):
+        raise NotImplementedError
+
+    # override this function
     def _learn(self, observation_sequences, action_sequences):
         """
         Parameters
@@ -126,7 +130,7 @@ class DynamicsLearnerExample(DynamicsLearnerInterface):
 if __name__ == '__main__':
     try:
 
-        data = np.load('../../Dataset/dataset_v01.npz')
+        data = np.load('./Dataset/dataset_v01.npz')
 
         observation_sequences = np.concatenate((data['measured_angles'],
                                                 data['measured_velocities'],
