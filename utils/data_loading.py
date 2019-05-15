@@ -25,7 +25,7 @@ def loadRobotData(filename):
                 containing the state trajectories of all rollouts
     """
     data = np.load(filename)
-    observations = np.concatenate((data['measured_angles'],
+    observations = np.concatenate((data['measured_angles'], data['measured_velocities'],
             data['measured_torques']), 2)
     actions = data['constrained_torques']
     return observations, actions
@@ -39,8 +39,18 @@ def concatenateActionsStates(history_actions, history_obs, future_actions):
     return np.concatenate((history_actions.flatten(), history_obs.flatten(),
             future_actions.flatten()))
 
-def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
-        difference_learning=True):
+def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon):
+    """
+    Receives sequences of observations and actions and returns training targets
+    and training inputs that will be used to learn the dynamics model.
+
+    Outputs
+    -------
+    targets:   np.array of shape training_instances x state dim
+
+    inputs:    np-array of shape traininig_instances x input_dimension
+               Note that input_dimension = (action dim+state dim)*history_len
+    """
     inputs = []
     targets = []
     for obs, act in zip(obs_seqs, actions_seqs):
@@ -53,8 +63,6 @@ def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
             current_input = concatenateActionsStates(hist_act, hist_obs,
                     future_act)
             current_target = output_obs
-            if difference_learning:
-                current_target -= hist_obs[-1]
             inputs.append(current_input)
             targets.append(current_target)
     return np.vstack(targets), np.vstack(inputs)
