@@ -3,6 +3,8 @@ import sys
 import ipdb
 import traceback
 
+from DL.utils import unrollTrainingData, concatenateActionsStates, Standardizer
+
 
 class DynamicsLearnerInterface(object):
 
@@ -15,7 +17,16 @@ class DynamicsLearnerInterface(object):
     # do not override this function!
     def learn(self, observation_sequences, action_sequences):
         self._check_learning_inputs(observation_sequences, action_sequences)
-        self._learn(observation_sequences, action_sequences)
+        targets, inputs = unrollTrainingData(observation_sequences, action_sequences,
+                self.history_length, self.prediction_horizon)
+
+        # Whitening the inputs.
+        self.targets_standardizer = Standardizer(targets)
+        self.inputs_standardizer = Standardizer(inputs)
+        standardized_targets = self.targets_standardizer.standardize(targets)
+        standardized_inputs = self.inputs_standardizer.standardize(inputs)
+
+        self._learn(standardized_inputs, standardized_targets)
 
     # do not override this function!
     def predict(self, observation_history, action_history, action_future=None):
@@ -25,9 +36,23 @@ class DynamicsLearnerInterface(object):
                                       0,
                                       self.action_dimension))
         self._check_prediction_inputs(observation_history, action_history, action_future)
-        observation_prediction = self._predict(observation_history, action_history, action_future)
-        self._check_prediction_outputs(observation_history, observation_prediction)
-        return observation_prediction
+
+        # Making a single input from all the input parameters.
+        dynamics_inputs = concatenateActionsStates(action_history,
+                observation_history, action_future)
+
+        # Whitening the input.
+        whitened_input = self.inputs_standardizer.standardize(dynamics_inputs)
+
+        whitened_predictions = self._predict(whitened_input)
+
+        # Dewhitening the output
+        dewhitened_predictions = self.targets_standardizer.unstandardize(
+                whitened_predictions)
+
+        self._check_prediction_outputs(observation_history,
+                dewhitened_predictions)
+        return dewhitened_predictions
 
     # do not override this function!
     def predict_recursively(self, observation_history, action_history, action_future):
@@ -41,8 +66,10 @@ class DynamicsLearnerInterface(object):
 
         for t in xrange(action_future.shape[1]):
             predicted_observation = np.expand_dims(predicted_observation, axis=1)
-            observation_history_t = np.append(observation_history_t[:, 1:], predicted_observation, axis=1)
-            action_history_t = np.append(action_history_t[:, 1:], action_future[:, t:t + 1], axis=1)
+            observation_history_t = np.append(observation_history_t[:, 1:],
+                    predicted_observation, axis=1)
+            action_history_t = np.append(action_history_t[:, 1:],
+                    action_future[:, t:t + 1], axis=1)
             predicted_observation = self.predict(observation_history_t, action_history_t)
 
             assert (action_history_t[:, :-(t + 1)] == action_history[:, t + 1:]).all()
@@ -57,32 +84,28 @@ class DynamicsLearnerInterface(object):
         raise NotImplementedError
 
     # override this function
-    def _learn(self, observation_sequences, action_sequences):
+    def _learn(self, training_inputs, training_targets):
         """
         Parameters
         ----------
-        observation_sequences:  np-array of shape nSequences x nStepsPerRollout x observation_dimension
-                                past state observations
-        action_sequences:       np-array of shape nSequences x nStepsPerRollout x action_dimension
-                                actions taken at the corresponding time points.
+        training_inputs:        np-array of shape nTrainingInstances x input dim
+                                that represents the input to the dynamics
+                                (i.e. relevant observations and actions within
+                                the history length and prediction horizon)
+        training_targets:       np-array of shape nTrainingInstances x state dim
+                                denoting the targets of the dynamics model.
         """
         raise NotImplementedError
 
     # override this function
-    def _predict(self, observation_history, action_history, action_future):
+    def _predict(self, single_input):
         """
         Parameters
         ----------
-        observation_history:    np-array of shape n_samples x
-                                self.history_length x observation_dimension
-        action_history:         np-array of shape n_samples x
-                                self.history_length x action_dimension
-        action_future:          np-array of shape n_samples x
-                                self.prediction_horizon - 1 x action_dimension
-                                actions to be applied to the system. The first
-                                action is the action applied one time step after
-                                the last action of the corresponding
-                                "action_history".
+        single_input:           one dimensional np-array with all the inputs to
+                                the dynamics model concatenated (size: input dim)
+                                (i.e. relevant observations and actions within
+                                the history length and prediction horizon)
         Outputs
         ----------
         observation_prediction: np-array of shape n_samples x observation_dimension
@@ -125,11 +148,11 @@ class DynamicsLearnerExample(DynamicsLearnerInterface):
     def name(self):
         return 'dynamics_learner_example'
 
-    def _learn(self, observation_sequences, action_sequences):
+    def _learn(self, training_inputs, training_targets):
         pass
 
-    def _predict(self, observation_history, action_history, action_future):
-        return observation_history[:, -1, :]
+    def _predict(self, single_input):
+        return np.zeros((single_input.shape[0], self.observation_dimension))
 
 
 if __name__ == '__main__':
@@ -148,10 +171,11 @@ if __name__ == '__main__':
         dynamics_learner = DynamicsLearnerExample(history_length, prediction_horizon)
         dynamics_learner.learn(observation_sequences, action_sequences)
 
-        observation_prediction = dynamics_learner.predict(observation_sequences[:, :history_length],
-                                                          action_sequences[:, :history_length],
-                                                          action_sequences[:, history_length:history_length
-                                                                                             + prediction_horizon - 1])
+        observation_prediction = dynamics_learner.predict(
+                observation_sequences[:, :history_length],
+                action_sequences[:, :history_length],
+                action_sequences[:, history_length:history_length +
+                prediction_horizon - 1])
 
         rms = np.linalg.norm(observation_sequences[:, history_length + prediction_horizon - 1] -
                              observation_prediction)
