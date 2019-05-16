@@ -58,7 +58,8 @@ if __name__ == "__main__":
     observations, actions = loadRobotData(args.data_filename)
 
     if args.method == 'example':
-        dynamics_learner = DynamicsLearnerExample(10, 10)
+        dynamics_learner = DynamicsLearnerExample(1, 10)
+        dynamics_learner.learn(observations, actions)
         evaluate(dynamics_learner, observations, actions, 'some_identifier_for_dataset')
     elif args.method == 'pilco':
         pass

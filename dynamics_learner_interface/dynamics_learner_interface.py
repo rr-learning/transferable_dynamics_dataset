@@ -32,14 +32,14 @@ class DynamicsLearnerInterface(object):
         self._learn(standardized_inputs, standardized_targets)
 
     # do not override this function!
-    def predict(self, observation_history, action_history, action_future=None):
+    def _preprocess_and_predict(self, observation_history, action_history, action_future=None):
         if action_future is None:
             assert self.prediction_horizon == 1
             action_future = np.empty((observation_history.shape[0],
                                       0,
                                       self.action_dimension))
-        self._check_prediction_inputs(observation_history, action_history,
-                action_future)
+
+        self._check_prediction_inputs(observation_history, action_history, action_future)
 
         # Making a single input from all the input parameters.
         dynamics_inputs = concatenateActionsStates(action_history,
@@ -62,14 +62,21 @@ class DynamicsLearnerInterface(object):
         return dewhitened_predictions
 
     # do not override this function!
-    def predict_recursively(self, observation_history, action_history, action_future):
+    def predict(self, observation_history, action_history, action_future=None):
+        if action_future is None:
+            assert self.prediction_horizon == 1
+            action_future = np.empty((observation_history.shape[0],
+                                      0,
+                                      self.action_dimension))
+
+        if self.prediction_horizon == action_future.shape[1] + 1:
+            return self._preprocess_and_predict(observation_history, action_history, action_future)
+
         assert self.prediction_horizon == 1
-        assert observation_history.shape[1] == self.history_length
-        assert action_history.shape[1] == self.history_length
 
         observation_history_t = observation_history
         action_history_t = action_history
-        predicted_observation = self.predict(observation_history_t, action_history_t)
+        predicted_observation = self._preprocess_and_predict(observation_history_t, action_history_t)
 
         for t in xrange(action_future.shape[1]):
             predicted_observation = np.expand_dims(predicted_observation, axis=1)
@@ -77,7 +84,7 @@ class DynamicsLearnerInterface(object):
                     predicted_observation, axis=1)
             action_history_t = np.append(action_history_t[:, 1:],
                     action_future[:, t:t + 1], axis=1)
-            predicted_observation = self.predict(observation_history_t, action_history_t)
+            predicted_observation = self._preprocess_and_predict(observation_history_t, action_history_t)
 
             assert (action_history_t[:, :-(t + 1)] == action_history[:, t + 1:]).all()
             assert (observation_history_t[:, :-(t + 1)] == observation_history[:, t + 1:]).all()
