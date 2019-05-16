@@ -149,6 +149,22 @@ class DynamicsLearnerInterface(object):
         assert observation_prediction.shape == (n_samples,
                                                 self.observation_dimension)
 
+    def load(self, filename):
+        """
+        Parameters
+        ----------
+        filename:   string used as filename to load a model.
+        """
+        raise NotImplementedError
+
+    def save(self, filename):
+        """
+        Parameters
+        ----------
+        filename:   string used as filename to save a model.
+        """
+        raise NotImplementedError
+
 
 class DynamicsLearnerExample(DynamicsLearnerInterface):
 
