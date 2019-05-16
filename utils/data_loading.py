@@ -61,7 +61,8 @@ def concatenateActionsStates(history_actions, history_obs, future_actions):
     assert joint_states_actions.shape[0] == history_obs.shape[0]
     return joint_states_actions
 
-def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon):
+def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
+        difference_learning):
     """
     Receives sequences of observations and actions and returns training targets
     and training inputs that will be used to learn the dynamics model.
@@ -85,6 +86,8 @@ def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon):
         current_input = concatenateActionsStates(hist_act, hist_obs,
                 future_act)
         current_target = output_obs
+        if difference_learning:
+            current_target = current_target.copy() - hist_obs[:, -1, :]
         inputs.append(current_input)
         targets.append(current_target)
     return np.vstack(targets), np.vstack(inputs)

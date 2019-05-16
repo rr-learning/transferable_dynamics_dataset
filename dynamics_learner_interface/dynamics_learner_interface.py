@@ -8,17 +8,20 @@ from DL.utils import unrollTrainingData, concatenateActionsStates, Standardizer
 
 class DynamicsLearnerInterface(object):
 
-    def __init__(self, history_length, prediction_horizon):
+    def __init__(self, history_length, prediction_horizon,
+            difference_learning = True):
         self.history_length = history_length
         self.prediction_horizon = prediction_horizon
         self.observation_dimension = 9
         self.action_dimension = 3
+        self.difference_learning = difference_learning
 
     # do not override this function!
     def learn(self, observation_sequences, action_sequences):
         self._check_learning_inputs(observation_sequences, action_sequences)
-        targets, inputs = unrollTrainingData(observation_sequences, action_sequences,
-                self.history_length, self.prediction_horizon)
+        targets, inputs = unrollTrainingData(observation_sequences,
+                action_sequences, self.history_length, self.prediction_horizon,
+                self.difference_learning)
 
         # Whitening the inputs.
         self.targets_standardizer = Standardizer(targets)
@@ -35,7 +38,8 @@ class DynamicsLearnerInterface(object):
             action_future = np.empty((observation_history.shape[0],
                                       0,
                                       self.action_dimension))
-        self._check_prediction_inputs(observation_history, action_history, action_future)
+        self._check_prediction_inputs(observation_history, action_history,
+                action_future)
 
         # Making a single input from all the input parameters.
         dynamics_inputs = concatenateActionsStates(action_history,
@@ -49,6 +53,9 @@ class DynamicsLearnerInterface(object):
         # Dewhitening the output
         dewhitened_predictions = self.targets_standardizer.unstandardize(
                 whitened_predictions)
+
+        if self.difference_learning:
+            dewhitened_predictions += observation_history[:, -1, :]
 
         self._check_prediction_outputs(observation_history,
                 dewhitened_predictions)
@@ -171,14 +178,22 @@ if __name__ == '__main__':
         dynamics_learner = DynamicsLearnerExample(history_length, prediction_horizon)
         dynamics_learner.learn(observation_sequences, action_sequences)
 
-        observation_prediction = dynamics_learner.predict(
-                observation_sequences[:, :history_length],
-                action_sequences[:, :history_length],
-                action_sequences[:, history_length:history_length +
-                prediction_horizon - 1])
-
+        hist_obs = observation_sequences[:, :history_length].copy()
+        hist_act = action_sequences[:, :history_length].copy()
+        fut_act = action_sequences[:, history_length:history_length +
+                prediction_horizon - 1].copy()
+        observation_prediction = dynamics_learner.predict(hist_obs, hist_act,
+                fut_act)
         rms = np.linalg.norm(observation_sequences[:, history_length + prediction_horizon - 1] -
                              observation_prediction)
+
+        # Asserting that the inputs to the predict method were left unchanged.
+        assert np.array_equal(hist_obs,
+                observation_sequences[:, :history_length])
+        assert np.array_equal(hist_act,
+                action_sequences[:, :history_length])
+        assert np.array_equal(fut_act, action_sequences[:,
+                history_length:history_length + prediction_horizon - 1])
         print('rms: ', rms)
 
         ipdb.set_trace()
