@@ -121,9 +121,10 @@ class DynamicsLearnerInterface(object):
                                 the history length and prediction horizon)
         Outputs
         ----------
-        observation_prediction: two dimensional np-array  shape: (1, observation_dimension)
+        observation_prediction: np-array of shape n_samples x observation_dimension
                                 corresponding the prediction for the observation
-                                after 1 step.
+                                prediction_horizon steps after the last observation
+                                of observation_history
 
         """
         raise NotImplementedError
