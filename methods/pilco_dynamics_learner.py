@@ -1,51 +1,51 @@
+"""
+Dynamics learning using GPs as in PILCO.
+"""
+
+import argparse
 import numpy as np
-from collections import defaultdict
 from DL import DynamicsLearnerInterface
-from DL.utils.data_loading import unrollForDifferenceTraining,\
-        subsampleTrainingSet, concatenateActionsStates
+from DL.utils import loadRobotData
 from pilco.models import PILCO
 
 class PilcoDynamicsLearner(DynamicsLearnerInterface):
 
-    def __init__(self, ninducing_points=None, ntraining_points=None):
-        self.ninducing = ninducing_points
-        self.ntraining = ntraining_points
-    
-    def learn(self, obs_seqs, actions_seqs):
-        self._check_learning_inputs(obs_seqs, actions_seqs)
-        assert self.ntraining
-        targets, inputs = unrollForDifferenceTraining(obs_seqs, actions_seqs)
-        inputs, targets = subsampleTrainingSet(inputs, targets, self.ntraining)
+    def __init__(self, history_length, prediction_horizon, ninducing_points,
+            nsampled_training_points = None):
+        super().__init__(history_length, prediction_horizon)
+        self.ninducing_points = ninducing_points
+        self.nsampled_training_points = nsampled_training_points
+
+    def _learn(self, training_inputs, training_targets):
+        assert self.ninducing_points
+
+        # Subsampling the data if required.
+        if self.nsampled_training_points:
+            training_inputs, training_targets = self._subsample_training_set(
+                    training_inputs, training_targets)
 
         # Full GP if no inducing points are provided.
-        self.pilco_ = PILCO(inputs, targets, self.ninducing)
+        self.pilco_ = PILCO(training_inputs, training_targets,
+                self.ninducing_points)
         self.pilco_.optimize_models(disp=True)
 
-    def predict(self, obs_hist, action_hist, action_fut):
-        self._check_prediction_inputs(obs_hist, action_hist, action_fut)
-        assert self.pilco_, "a trained model must be available"
-        _, obs_dim  = obs_hist.shape
-        _, action_dim = action_hist.shape
-        pred_len, _ = action_fut.shape
-        predictions = np.zeros((pred_len + 1, obs_dim))
-        last_input = concatenateActionsStates(action_hist[-1], obs_hist[-1])
-        last_obs = obs_hist[-1]
-        for i in range(pred_len):
-            predictions[i] = last_obs + self.predict_on_single_input(last_input)
-            last_input = concatenateActionsStates(action_fut[i], predictions[i])
-            last_obs = predictions[i]
-        predictions[i + 1] = last_obs + self.predict_on_single_input(last_input)
-        self._check_prediction_outputs(action_fut, predictions)
-        return predictions
-
-    def predict_on_single_input(self, action_state_input):
+    def _predict(self, inputs):
         assert self.pilco_, "a trained model must be available"
         prediction = []
-        action_state_input = action_state_input.reshape((1,-1))  # 1xD.
         for model in self.pilco_.mgpr.models:
-            mean, _ = model.predict_f(action_state_input)
-            prediction.append(mean.item())
-        return np.array(prediction)
+            means, _ = model.predict_f(inputs)
+            prediction.append(means)
+        return np.hstack(prediction)
+
+    def _subsample_training_set(self, training_inputs, training_targets):
+        assert self.nsampled_training_points
+        total_size = training_inputs.shape[0]
+        permutation = np.random.permutation(
+                total_size)[:self.nsampled_training_points]
+        return training_inputs[permutation], training_targets[permutation]
+
+    def name(self):
+        return "pilco"
 
     def load(self, filename):
         params_dict = np.load(filename)
@@ -65,3 +65,17 @@ class PilcoDynamicsLearner(DynamicsLearnerInterface):
                 params_dict[key].append(params[key])
         np.savez(filename, **params_dict)
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data_filename", required=True,
+            help="<Required> filename of the input robot data")
+    parser.add_argument("--output_filename", required=True,
+            help="<Required> filename where the model wiill be saved")
+    parser.add_argument("--ninducing", default=10)
+    parser.add_argument("--ntraining", default=10)
+    args = parser.parse_args()
+    observations, actions = loadRobotData(args.data_filename)
+    dynamics_model = PilcoDynamicsLearner(1, 1, args.ninducing, args.ntraining)
+    dynamics_model.learn(observations, actions)
+    dynamics_model.save(args.output_filename)
+    print(dynamics_model.name)
