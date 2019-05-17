@@ -19,12 +19,17 @@ from eql.model import ModelFn as EQLModelFn
 
 
 from DL import DynamicsLearnerInterface
-from DL.utils.data_loading import DataProcessor
-from DL.utils.data_loading import connected_shuffle
 
 
 class EQL(DynamicsLearnerInterface):
-    def __init__(self, model_arch_params, model_train_params, optional_params):
+    def __init__(self,
+                 history_length,
+                 prediction_horizon,
+                 model_arch_params,
+                 model_train_params,
+                 optional_params,
+                 difference_learning = True):
+
         self.eps = 1e-7
 
         self._parse_arch_params(**model_arch_params)
@@ -58,6 +63,7 @@ class EQL(DynamicsLearnerInterface):
                                                 model_dir=self.model_dir,
                                                 params=self.params)
         self.is_trained = False
+        super().__init__(history_length, prediction_horizon)
 
     def _parse_arch_params(self, num_h_layers, layer_width):
         self.num_h_layers = num_h_layers
@@ -79,15 +85,25 @@ class EQL(DynamicsLearnerInterface):
         self.train_val_split = train_val_split
         self.model_dir = model_dir
 
-    def learn(self, states, actions, deltas):
-        states_and_acts = np.concatenate((states, actions), axis=1)
-        inputs, outputs = connected_shuffle([states_and_acts, deltas])
-        data = (inputs, outputs)
+    def _learn(self, training_inputs, training_targets):
+        """
+        Parameters
+        ----------
+        training_inputs:        np-array of shape nTrainingInstances x input dim
+                                that represents the input to the dynamics
+                                (i.e. relevant observations and actions within
+                                the history length and prediction horizon)
+        training_targets:       np-array of shape nTrainingInstances x state dim
+                                denoting the targets of the dynamics model.
+        """
+        # states_and_acts = np.concatenate((states, actions), axis=1)
+        # inputs, outputs = connected_shuffle([states_and_acts, deltas])
+        data = (training_inputs, training_targets)
         metadata = extract_metadata_from_array(train_val_data=data, test_data=None, **self.params)
         self.model_fn.set_metadata(metadata=metadata)
         self.results = defaultdict(list)
         logging_hook = tf.train.LoggingTensorHook(tensors={'train_accuracy': 'train_accuracy'}, every_n_iter=1000)
-        train_input, val_input = get_train_input_fns_from_ndarrays(num_epochs=self.evaluate_every, inputs=inputs, outputs=outputs, **self.params, **metadata)
+        train_input, val_input = get_train_input_fns_from_ndarrays(num_epochs=self.evaluate_every, inputs=training_inputs, outputs=training_targets, **self.params, **metadata)
         print('One train episode equals %d epochs.' % self.evaluate_every)
         for i, reg_scale in enumerate(self.reg_scales):
             print('Regularizing with scale %s' % str(reg_scale))
@@ -113,31 +129,47 @@ class EQL(DynamicsLearnerInterface):
         _ = [func for func in dir(self.model_fn) if callable(getattr(self.model_fn, func))]
         self.model_fn.generate_symbolic_expression(3)
 
-    def predict(self, states, actions):
-        if states.ndim == 1:
-            states = states[None, ...]
-        if actions.ndim == 1:
-            actions = actions[None, ...]
-        inputs = np.concatenate((states, actions), axis=1)
+    def _predict(self, single_input):
+        """
+        Parameters
+        ----------
+        single_input:           one dimensional np-array with all the inputs to
+                                the dynamics model concatenated (size: input dim)
+                                (i.e. relevant observations and actions within
+                                the history length and prediction horizon)
+        Outputs
+        ----------
+        observation_prediction: two dimensional np-array  shape: (1, observation_dimension)
+                                corresponding the prediction for the observation
+                                after 1 step.
 
-        prediction = self.model_fn.numba_expr(*(inputs.T))
+        """
+
+        prediction = self.model_fn.numba_expr(*(single_input.T))
         prediction = np.asarray(prediction).T
         return prediction
 
-    def save(self, model_dir):
+    def name(self):
+        return 'EQL' #TODO: change to attribute
+
+    def save(self, filename):
+        """
+        Parameters
+        ----------
+        filename:   string used as filename to load a model.
+        """
         self.model_fn.generate_symbolic_expression(3)
         exprs = [self.model_fn.sympy_expr, self.model_fn.numba_expr]
 
-        if not os.path.exists(model_dir):
-            os.makedirs(model_dir)
-        with open(os.path.join(model_dir, "exprs.pickle"), 'wb') as handle:
+        with open(filename, 'wb') as handle:
             pickle.dump(exprs, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def load(self, model_dir):
-        with open(os.path.join(model_dir, "exprs.pickle"), 'rb') as handle:
+    def load(self, filename):
+        """
+        Parameters
+        ----------
+        filename:   string used as filename to save a model.
+        """
+        with open(filename, 'rb') as handle:
             exprs = pickle.load(handle)
         self.model_fn.sympy_expr, self.model_fn.numba_expr = exprs
-
-
-class NormalizedEQL(DataProcessor, EQL):
-    pass
