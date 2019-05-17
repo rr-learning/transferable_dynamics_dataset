@@ -4,6 +4,7 @@ Dynamics learning using GPs as in PILCO.
 
 import argparse
 import numpy as np
+from collections import defaultdict
 from DL import DynamicsLearnerInterface
 from DL.utils import loadRobotData
 from pilco.models import PILCO
