@@ -1,4 +1,5 @@
 import os
+from time import time
 
 import numpy as np
 from keras.layers import Dense
@@ -6,14 +7,20 @@ from keras.models import Sequential
 from keras.optimizers import Adam, Adadelta, Adagrad, SGD, RMSprop
 import keras.backend as K
 from keras.models import load_model
+from keras.callbacks import TensorBoard
 
 from DL import DynamicsLearnerInterface
-from DL.utils.data_loading import DataProcessor
-from DL.utils.data_loading import connected_shuffle
+
+
 
 
 class NNDynamicsLearner(DynamicsLearnerInterface):
-    def __init__(self, model_arch_params, model_train_params, mode ):
+    def __init__(self,
+                 history_length,
+                 prediction_horizon,
+                 model_arch_params,
+                 model_train_params,
+                 mode):
 
 
         self.input_dim = 12
@@ -24,59 +31,74 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
             self._parse_train_params(**model_train_params)
             self.model = Sequential()
             self.build()
+        super().__init__(history_length, prediction_horizon)
 
+    def name(self):
+        return 'NN' #TODO: change to attribute
 
     def _parse_arch_params(self, num_layers, num_units, activation):
         self.num_layers = num_layers
         self.size = num_units
         self.activation = activation_from_string(activation)
 
-    def _parse_train_params(self, learning_rate, optimizer, batch_size, validation_split, epochs, loss):
+    def _parse_train_params(self, learning_rate, optimizer, batch_size, validation_split, epochs, loss): #  l2_reg,
         self.learning_rate = learning_rate
         self.optimizer = optimizer_from_string(optimizer)(lr=self.learning_rate)
         self.batch_size = batch_size
         self.validation_split = validation_split
         self.epochs = epochs
         self.loss = loss
+        # self.l2_reg = l2_reg
 
     def build(self):
         all_dims = [self.input_dim] + [self.size] * (self.num_layers - 1)
         for in_dim, size in zip(all_dims[:-1], all_dims[1:]):
-            self.model.add(Dense(units=size, input_dim=in_dim, activation=self.activation))
+            self.model.add(Dense(units=size, input_dim=in_dim, activation=self.activation)) #, kernel_regularizer=regularizers.l2(self.l2_reg)
         self.model.add(Dense(units=self.output_dim, input_dim=all_dims[-1], activation=None))
 
         self.model.compile(optimizer=self.optimizer, loss=self.loss)
+        self.tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
 
-    def learn(self, states, actions, delta_states):
-        # super()._check_learning_inputs(observation_sequences, action_sequences)
-        if states.ndim == 1:
-            states = states[None, ...]
-        if actions.ndim == 1:
-            actions = actions[None, ...]
-        states_and_acts = np.concatenate((states, actions), axis=1)
-        shuffled_states_and_acts, shuffled_targets = connected_shuffle([states_and_acts, delta_states])
+    def _learn(self, training_inputs, training_targets):
+        """
+        Parameters
+        ----------
+        training_inputs:        np-array of shape nTrainingInstances x input dim
+                                that represents the input to the dynamics
+                                (i.e. relevant observations and actions within
+                                the history length and prediction horizon)
+        training_targets:       np-array of shape nTrainingInstances x state dim
+                                denoting the targets of the dynamics model.
+        """
+        self.model.fit(x=training_inputs, y=training_targets, batch_size=self.batch_size, epochs=self.epochs,
+                       validation_split=self.validation_split, shuffle=True, callbacks=[self.tensorboard])
 
-        self.model.fit(x=shuffled_states_and_acts, y=shuffled_targets, batch_size=self.batch_size, epochs=self.epochs,
-                       validation_split=self.validation_split, shuffle=True)
+    def _predict(self, single_input):
+        """
+        Parameters
+        ----------
+        single_input:           one dimensional np-array with all the inputs to
+                                the dynamics model concatenated (size: input dim)
+                                (i.e. relevant observations and actions within
+                                the history length and prediction horizon)
+        Outputs
+        ----------
+        observation_prediction: two dimensional np-array  shape: (1, observation_dimension)
+                                corresponding the prediction for the observation
+                                after 1 step.
 
-    def predict(self, states, actions):
-        states_and_acts = np.concatenate((states, actions), axis=1)
-        deltas = self.model.predict(states_and_acts)
+        """
+
+
+        deltas = self.model.predict(single_input)
         return deltas
 
-    def save(self, model_dir):
-        if not os.path.exists(model_dir):
-            os.makedirs(model_dir)
-        self.model.save(os.path.join(model_dir ,"keras_model.h5"))
+    def save(self, model_file):
+        self.model.save(model_file)
 
 
-    def load(self, model_dir):
-        self.model = load_model(os.path.join(model_dir ,"keras_model.h5"))
-
-
-class NormalizedNNDynamicsLearner(DataProcessor, NNDynamicsLearner):
-    pass
-
+    def load(self, model_file):
+        self.model = load_model(model_file)
 
 
 def optimizer_from_string(opt_str):

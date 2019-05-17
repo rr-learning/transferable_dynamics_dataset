@@ -78,7 +78,7 @@ class DynamicsLearnerInterface(object):
         action_history_t = action_history
         predicted_observation = self._preprocess_and_predict(observation_history_t, action_history_t)
 
-        for t in xrange(action_future.shape[1]):
+        for t in range(action_future.shape[1]):
             predicted_observation = np.expand_dims(predicted_observation, axis=1)
             observation_history_t = np.append(observation_history_t[:, 1:],
                     predicted_observation, axis=1)
@@ -89,7 +89,6 @@ class DynamicsLearnerInterface(object):
             assert (action_history_t[:, :-(t + 1)] == action_history[:, t + 1:]).all()
             assert (observation_history_t[:, :-(t + 1)] == observation_history[:, t + 1:]).all()
             assert (action_history_t[:, -1] == action_future[:, t]).all()
-            assert (observation_history_t[:, -1] == predicted_observation).all()
 
         return predicted_observation
 
