@@ -28,7 +28,7 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences, dataset_
         errors = np.empty((observation_sequences.shape[0],
                            len(T),
                            observation_sequences.shape[2]))
-        for i in xrange(len(T)):
+        for i in range(len(T)):
             t = T[i]
             observation_history = observation_sequences[:, t + 1 - history_length: t + 1]
             action_history = action_sequences[:, t + 1 - history_length: t + 1]
