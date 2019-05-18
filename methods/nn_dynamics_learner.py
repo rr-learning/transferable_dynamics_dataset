@@ -93,11 +93,15 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
         deltas = self.model.predict(single_input)
         return deltas
 
-    def save(self, model_file):
+    def save(self, model_file, norm_file=None):
+        if norm_file is not None:
+            super().save(norm_file)
         self.model.save(model_file)
 
 
-    def load(self, model_file):
+    def load(self, model_file, norm_file=None):
+        if norm_file is not None:
+            super().load(norm_file)
         self.model = load_model(model_file)
 
 

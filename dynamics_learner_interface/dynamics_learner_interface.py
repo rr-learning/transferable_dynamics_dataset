@@ -2,7 +2,7 @@ import numpy as np
 import sys
 import ipdb
 import traceback
-
+from collections import defaultdict
 from DL.utils import unrollTrainingData, concatenateActionsStates, Standardizer
 
 
@@ -157,19 +157,30 @@ class DynamicsLearnerInterface(object):
 
     def load(self, filename):
         """
-        Parameters
+        Loads the normalization statistics and other parameters.
         ----------
         filename:   string used as filename to load a model.
         """
-        raise NotImplementedError
+        normalization_dict = np.load(filename)
+        self.targets_standardizer = Standardizer()
+        self.inputs_standardizer = Standardizer()
+        self.inputs_standardizer.means = normalization_dict["input_means"]
+        self.inputs_standardizer.stds = normalization_dict["input_stds"]
+        self.targets_standardizer.stds = normalization_dict["target_stds"]
+        self.targets_standardizer.means = normalization_dict["target_means"]
 
     def save(self, filename):
         """
-        Parameters
+        Stores the normalization statistics and other parameters.
         ----------
         filename:   string used as filename to save a model.
         """
-        raise NotImplementedError
+        normalization_dict = defaultdict(list)
+        normalization_dict["input_means"] = self.inputs_standardizer.means
+        normalization_dict["input_stds"] = self.inputs_standardizer.stds
+        normalization_dict["target_stds"] = self.targets_standardizer.stds
+        normalization_dict["target_means"] = self.targets_standardizer.means
+        np.savez(filename, **normalization_dict)
 
 
 class DynamicsLearnerExample(DynamicsLearnerInterface):

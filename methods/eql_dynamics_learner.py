@@ -152,24 +152,27 @@ class EQL(DynamicsLearnerInterface):
     def name(self):
         return 'EQL' #TODO: change to attribute
 
-    def save(self, filename):
+    def save(self, filename, norm_file=None):
         """
         Parameters
         ----------
         filename:   string used as filename to load a model.
         """
-        self.model_fn.generate_symbolic_expression(3)
+        if norm_file is not None:
+            super().save(norm_file)
         exprs = [self.model_fn.sympy_expr, self.model_fn.numba_expr]
 
         with open(filename, 'wb') as handle:
             pickle.dump(exprs, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def load(self, filename):
+    def load(self, filename, norm_file=None):
         """
         Parameters
         ----------
         filename:   string used as filename to save a model.
         """
+        if norm_file is not None:
+            super().load(norm_file)
         with open(filename, 'rb') as handle:
             exprs = pickle.load(handle)
         self.model_fn.sympy_expr, self.model_fn.numba_expr = exprs

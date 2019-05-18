@@ -1,6 +1,7 @@
 """
 Evaluation funcionality. Note that it can also be called as a script.
 """
+import os
 import ipdb
 import argparse
 import numpy as np
@@ -39,10 +40,10 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences, dataset_
             true_observation = observation_sequences[:, t + prediction_horizon]
             errors[:, i] = observation_prediction - true_observation
 
-        filename = dynamics_learner.name() + \
+        filename = os.path.join('./Results/errors', dynamics_learner.name() + \
                    '__history_' + str(history_length) + \
                    '__training_horizon_' + str(dynamics_learner.prediction_horizon) + \
-                   '__evaluation_horizon_' + str(prediction_horizon) + '__' + dataset_name
+                   '__evaluation_horizon_' + str(prediction_horizon) + '__' + dataset_name)
 
         np.save(filename, errors)
 
