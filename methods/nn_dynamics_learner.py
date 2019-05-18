@@ -8,6 +8,7 @@ from keras.optimizers import Adam, Adadelta, Adagrad, SGD, RMSprop
 import keras.backend as K
 from keras.models import load_model
 from keras.callbacks import TensorBoard
+from keras import regularizers
 
 from DL import DynamicsLearnerInterface
 
@@ -41,19 +42,19 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
         self.size = num_units
         self.activation = activation_from_string(activation)
 
-    def _parse_train_params(self, learning_rate, optimizer, batch_size, validation_split, epochs, loss): #  l2_reg,
+    def _parse_train_params(self, learning_rate, optimizer, batch_size, validation_split, epochs, loss, l2_reg): #  l2_reg,
         self.learning_rate = learning_rate
         self.optimizer = optimizer_from_string(optimizer)(lr=self.learning_rate)
         self.batch_size = batch_size
         self.validation_split = validation_split
         self.epochs = epochs
         self.loss = loss
-        # self.l2_reg = l2_reg
+        self.l2_reg = l2_reg
 
     def build(self):
         all_dims = [self.input_dim] + [self.size] * (self.num_layers - 1)
         for in_dim, size in zip(all_dims[:-1], all_dims[1:]):
-            self.model.add(Dense(units=size, input_dim=in_dim, activation=self.activation)) #, kernel_regularizer=regularizers.l2(self.l2_reg)
+            self.model.add(Dense(units=size, input_dim=in_dim, activation=self.activation, kernel_regularizer=regularizers.l2(self.l2_reg))) #
         self.model.add(Dense(units=self.output_dim, input_dim=all_dims[-1], activation=None))
 
         self.model.compile(optimizer=self.optimizer, loss=self.loss)
