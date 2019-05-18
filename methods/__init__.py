@@ -1,1 +1,1 @@
-from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerInterface
+from DL.methods.pilco_dynamics_learner import PilcoDynamicsLearner

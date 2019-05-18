@@ -5,13 +5,13 @@ import os
 import ipdb
 import argparse
 import numpy as np
-# from DL.methods.pilco_dynamics_learner import PilcoDynamicsLearner
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerExample
-
+from DL.methods import PilcoDynamicsLearner
 from DL.utils.data_loading import loadRobotData
 
 
-def evaluate(dynamics_learner, observation_sequences, action_sequences, dataset_name):
+def evaluate(dynamics_learner, observation_sequences, action_sequences,
+        test_dataset_name):
     possible_history_lengths = [1, 10]
     possible_prediction_horizons = [1, 10, 100, 1000]
     assert dynamics_learner.history_length in possible_history_lengths
@@ -23,6 +23,7 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences, dataset_
     else:
         prediction_horizons = [dynamics_learner.prediction_horizon]
 
+    output_errors = {}
     for prediction_horizon in prediction_horizons:
         T = range(possible_history_lengths[-1] - 1,
                   observation_sequences.shape[1] - possible_prediction_horizons[-1])
@@ -40,37 +41,43 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences, dataset_
             true_observation = observation_sequences[:, t + prediction_horizon]
             errors[:, i] = observation_prediction - true_observation
 
-        filename = os.path.join('./Results/errors', dynamics_learner.name() + \
-                   '__history_' + str(history_length) + \
-                   '__training_horizon_' + str(dynamics_learner.prediction_horizon) + \
-                   '__evaluation_horizon_' + str(prediction_horizon) + '__' + dataset_name)
-
-        np.save(filename, errors)
+        errors_key = dynamics_learner.name() + '__history_' + \
+                str(history_length) + '__training_horizon_' + \
+                str(dynamics_learner.prediction_horizon) + \
+                '__evaluation_horizon_' + str(prediction_horizon) + '__' + \
+                test_dataset_name
+        output_errors[errors_key] = errors
+    return output_errors
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data_filename", required=True, help="<Required> filename of"
-            " the input robot data")
-    parser.add_argument("--method", required=True, help="<Required> Name of the"
-            " method that will be tested", choices=['example', 'pilco'])
+    parser.add_argument("--training_data", required=True,
+            help="<Required> filename of the input robot trainig data")
+    parser.add_argument("--testing_data", required=True,
+            help="<Required> filename of the input robot testing data")
+    parser.add_argument("--method", required=True,
+            help="<Required> Name of the method that will be tested",
+            choices=['example', 'pilco'])
+    parser.add_argument("--output", required=True,
+            help="<Required> filename where the computed errors will be saved")
     args = parser.parse_args()
-
-    observations, actions = loadRobotData(args.data_filename)
-
+    dynamics_learner = None
     if args.method == 'example':
         dynamics_learner = DynamicsLearnerExample(1, 10)
-        dynamics_learner.learn(observations, actions)
-        evaluate(dynamics_learner, observations, actions, 'some_identifier_for_dataset')
-    elif args.method == 'pilco':
-        pass
-        #
-        # # TODO: Add the following hyperparameters to the Settings directory
-        # # and load it as a commmand line argument.
-        # ninducing = 10
-        # ntraining = 10
-        # dynamics_learner = PilcoDynamicsLearner(ninducing, ntraining)
-        # dynamics_learner.load('some_filename')
-        # evaluate(dynamics_learner, observations, actions, args.data_filename)
-    else:
-        raise NotImplementedError
+    elif args.method == 'pilco_ninducing_500_ntraining_50000':
+        ninducing = 500
+        ntraining = 50000
+        history_length = 1
+        prediction_horizon = 1
+        dynamics_learner = PilcoDynamicsLearner(history_length,
+                prediction_horizon, ninducing, ntraining)
+        print("Training Done")
+    assert dynamics_learner, "Make sure the method is implemented."
+    training_observations, training_actions = loadRobotData(args.training_data)
+    testing_observations, testing_actions = loadRobotData(args.testing_data)
+    dynamics_learner.learn(training_observations, training_actions)
+    errors = evaluate(dynamics_learner, testing_observations,
+            testing_actions, args.testing_data)
+    np.savez(args.output, **errors)
+
