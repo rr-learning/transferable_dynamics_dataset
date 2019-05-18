@@ -64,7 +64,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     dynamics_learner = None
     if args.method == 'example':
-        dynamics_learner = DynamicsLearnerExample(1, 10)
+        dynamics_learner = DynamicsLearnerExample(1, 1)
     elif args.method == 'pilco_ninducing_500_ntraining_50000':
         ninducing = 500
         ntraining = 50000
