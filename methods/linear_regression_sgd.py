@@ -24,8 +24,10 @@ class LinearModelSGD(DynamicsLearnerInterface):
     def _predict(self, inputs):
         assert self.models_, "a trained model must be available"
         prediction = []
-        for model in self.pilco_.mgpr.models:
+        for model in self.models_:
             prediction.append(model.predict(inputs))
+
+        # TODO: make sure the behavior for vectorized inputs is the expected.
         return np.hstack(prediction)
 
     def name(self):

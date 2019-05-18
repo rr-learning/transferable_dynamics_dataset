@@ -1,1 +1,2 @@
+from DL.methods.linear_regression_sgd import LinearModelSGD
 from DL.methods.pilco_dynamics_learner import PilcoDynamicsLearner

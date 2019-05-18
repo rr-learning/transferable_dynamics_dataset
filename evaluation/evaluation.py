@@ -6,7 +6,7 @@ import ipdb
 import argparse
 import numpy as np
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerExample
-from DL.methods import PilcoDynamicsLearner
+from DL.methods import LinearModelSGD, PilcoDynamicsLearner
 from DL.utils.data_loading import loadRobotData
 
 
@@ -57,8 +57,7 @@ if __name__ == "__main__":
     parser.add_argument("--testing_data", required=True,
             help="<Required> filename of the input robot testing data")
     parser.add_argument("--method", required=True,
-            help="<Required> Name of the method that will be tested",
-            choices=['example', 'pilco'])
+            help="<Required> Name of the method that will be tested")
     parser.add_argument("--output", required=True,
             help="<Required> filename where the computed errors will be saved")
     args = parser.parse_args()
@@ -73,6 +72,8 @@ if __name__ == "__main__":
         dynamics_learner = PilcoDynamicsLearner(history_length,
                 prediction_horizon, ninducing, ntraining)
         print("Training Done")
+    elif args.method == 'linear_model_sgd':
+        dynamics_learner = LinearModelSGD(1, 1)
     assert dynamics_learner, "Make sure the method is implemented."
     training_observations, training_actions = loadRobotData(args.training_data)
     testing_observations, testing_actions = loadRobotData(args.testing_data)
