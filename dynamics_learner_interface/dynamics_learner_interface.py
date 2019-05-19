@@ -24,8 +24,7 @@ class DynamicsLearnerInterface(object):
                 self.difference_learning)
 
         # Whitening the inputs.
-        self.targets_standardizer = Standardizer(targets)
-        self.inputs_standardizer = Standardizer(inputs)
+        self.load_normalization_stats(observation_sequences, action_sequences)
         standardized_targets = self.targets_standardizer.standardize(targets)
         standardized_inputs = self.inputs_standardizer.standardize(inputs)
 
@@ -84,7 +83,8 @@ class DynamicsLearnerInterface(object):
                     predicted_observation, axis=1)
             action_history_t = np.append(action_history_t[:, 1:],
                     action_future[:, t:t + 1], axis=1)
-            predicted_observation = self._preprocess_and_predict(observation_history_t, action_history_t)
+            predicted_observation = self._preprocess_and_predict(
+                    observation_history_t, action_history_t)
 
             assert (action_history_t[:, :-(t + 1)] == action_history[:, t + 1:]).all()
             assert (observation_history_t[:, :-(t + 1)] == observation_history[:, t + 1:]).all()
@@ -155,32 +155,26 @@ class DynamicsLearnerInterface(object):
         assert observation_prediction.shape == (n_samples,
                                                 self.observation_dimension)
 
-    def load(self, filename):
+    def load_normalization_stats(self, observation_sequences, action_sequences):
         """
-        Loads the normalization statistics and other parameters.
-        ----------
-        filename:   string used as filename to load a model.
+        Loads the normalization statistics from the input data.
         """
-        normalization_dict = np.load(filename)
-        self.targets_standardizer = Standardizer()
-        self.inputs_standardizer = Standardizer()
-        self.inputs_standardizer.means = normalization_dict["input_means"]
-        self.inputs_standardizer.stds = normalization_dict["input_stds"]
-        self.targets_standardizer.stds = normalization_dict["target_stds"]
-        self.targets_standardizer.means = normalization_dict["target_means"]
+        self._check_learning_inputs(observation_sequences, action_sequences)
+        targets, inputs = unrollTrainingData(observation_sequences,
+                action_sequences, self.history_length, self.prediction_horizon,
+                self.difference_learning)
 
-    def save(self, filename):
-        """
-        Stores the normalization statistics and other parameters.
-        ----------
-        filename:   string used as filename to save a model.
-        """
-        normalization_dict = defaultdict(list)
-        normalization_dict["input_means"] = self.inputs_standardizer.means
-        normalization_dict["input_stds"] = self.inputs_standardizer.stds
-        normalization_dict["target_stds"] = self.targets_standardizer.stds
-        normalization_dict["target_means"] = self.targets_standardizer.means
-        np.savez(filename, **normalization_dict)
+        # Loading the standardizers.
+        self.targets_standardizer = Standardizer(targets)
+        self.inputs_standardizer = Standardizer(inputs)
+
+    # Override this function.
+    def load(self, model_filename):
+        raise NotImplementedError
+
+    # Override this function.
+    def save(self, model_filename):
+        raise NotImplementedError
 
 
 class DynamicsLearnerExample(DynamicsLearnerInterface):

@@ -70,13 +70,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_filename", required=True,
             help="<Required> filename of the input robot data")
-    parser.add_argument("--output_filename", required=True,
-            help="<Required> filename where the model wiill be saved")
-    parser.add_argument("--ninducing", default=10)
-    parser.add_argument("--ntraining", default=10)
+    parser.add_argument("--model_filename", required=True,
+            help="<Required> filename where the model will be saved")
+    parser.add_argument("--ninducing", default=10, type=int)
+    parser.add_argument("--ntraining", default=10, type=int)
     args = parser.parse_args()
     observations, actions = loadRobotData(args.data_filename)
     dynamics_model = PilcoDynamicsLearner(1, 1, args.ninducing, args.ntraining)
     dynamics_model.learn(observations, actions)
-    dynamics_model.save(args.output_filename)
-    print(dynamics_model.name)
+    dynamics_model.save(args.model_filename)
+
+    # TODO: figure out why after the next line tensorflow throws an error.
+    # This apparently only happens when this is file is executed as a script.
+    print(dynamics_model.name())

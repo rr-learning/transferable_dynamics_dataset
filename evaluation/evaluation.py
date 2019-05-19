@@ -6,7 +6,8 @@ import ipdb
 import argparse
 import numpy as np
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerExample
-from DL.methods import LinearModelSGD, PilcoDynamicsLearner
+from DL.methods.linear_regression_sgd import LinearModelSGD
+from DL.methods.pilco_dynamics_learner import PilcoDynamicsLearner
 from DL.utils.data_loading import loadRobotData
 
 
