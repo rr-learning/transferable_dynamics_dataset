@@ -1,5 +1,5 @@
 """
-Evaluation funcionality. Note that it can also be called as a script.
+Evaluation functionality. Note that it can also be called as a script.
 """
 import os
 import ipdb
@@ -36,9 +36,10 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
             observation_history = observation_sequences[:, t + 1 - history_length: t + 1]
             action_history = action_sequences[:, t + 1 - history_length: t + 1]
             action_future = action_sequences[:, t + 1: t + prediction_horizon]
-            observation_prediction = dynamics_learner.predict(observation_history=observation_history,
-                                                              action_history=action_history,
-                                                              action_future=action_future)
+            observation_prediction = dynamics_learner.predict(
+                    observation_history=observation_history,
+                    action_history=action_history,
+                    action_future=action_future)
             true_observation = observation_sequences[:, t + prediction_horizon]
             errors[:, i] = observation_prediction - true_observation
 
@@ -54,13 +55,19 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--training_data", required=True,
-            help="<Required> filename of the input robot trainig data")
+            help="<Required> filename of the input robot training data")
+    parser.add_argument("--trained_model",
+            help="filename of a trained model. If specified the model won't be"
+            " trained")
     parser.add_argument("--testing_data", required=True,
             help="<Required> filename of the input robot testing data")
     parser.add_argument("--method", required=True,
             help="<Required> Name of the method that will be tested")
-    parser.add_argument("--output", required=True,
+    parser.add_argument("--output_errors", required=True,
             help="<Required> filename where the computed errors will be saved")
+    parser.add_argument("--output_model",
+            help="filename where the trained model will be saved if a trained"
+            " model was not already provided in the command line.")
     args = parser.parse_args()
     dynamics_learner = None
     if args.method == 'example':
@@ -78,8 +85,15 @@ if __name__ == "__main__":
     assert dynamics_learner, "Make sure the method is implemented."
     training_observations, training_actions = loadRobotData(args.training_data)
     testing_observations, testing_actions = loadRobotData(args.testing_data)
-    dynamics_learner.learn(training_observations, training_actions)
+    if args.trained_model:
+        dynamics_learner.load_normalization_stats(training_observations,
+                training_actions)
+        dynamics_learner.load(args.trained_model)
+    else:
+        dynamics_learner.learn(training_observations, training_actions)
+        if args.output_model:
+            dynamics_learner.save(args.output_model)
     errors = evaluate(dynamics_learner, testing_observations,
             testing_actions, args.testing_data)
-    np.savez(args.output, **errors)
+    np.savez(args.output_errors, **errors)
 
