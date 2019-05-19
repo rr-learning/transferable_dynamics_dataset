@@ -23,12 +23,10 @@ class LinearModelSGD(DynamicsLearnerInterface):
 
     def _predict(self, inputs):
         assert self.models_, "a trained model must be available"
-        prediction = []
-        for model in self.models_:
-            prediction.append(model.predict(inputs))
-
-        # TODO: make sure the behavior for vectorized inputs is the expected.
-        return np.hstack(prediction)
+        prediction = np.zeros((inputs.shape[0], self.observation_dimension))
+        for i, model in enumerate(self.models_):
+            prediction[:, i] = model.predict(inputs)
+        return prediction
 
     def name(self):
         return "linear-model-SGD"
