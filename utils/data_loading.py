@@ -42,16 +42,16 @@ def concatenateActionsStates(history_actions, history_obs, future_actions):
     Parameters
     ----------
 
-    history_actions:    np array with shape nsequences x history len x input dim
+    history_actions:    np array with shape nsequences x history len x action dim
     history_obs:        np array with shape nsequences x history len x state dim
     future_actions:     np array with shape nsequences x prediction horizon - 1
-                        x input dim.
+                        x action dim.
     Returns
     -------
 
-    joint_states_actions: np array with shape nsequences x (history len x input dim
+    joint_states_actions: np array with shape nsequences x (history len x action dim
                           + history len x state dim + (prediction horizon - 1)
-                          * input_dim).
+                          * action dim).
 
     """
     joint_states_actions = [history_actions.reshape(
@@ -104,7 +104,8 @@ def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
     targets:   np.array of shape training_instances x state dim
 
     inputs:    np-array of shape traininig_instances x input_dimension
-               Note that input_dimension = (action dim+state dim)*history_len
+               Note that input_dimension = (action dim+state dim)*history_len +
+               (prediction_horizon - 1) x action dim
     """
     assert obs_seqs.shape[:2] == actions_seqs.shape[:2]
     inputs = []
