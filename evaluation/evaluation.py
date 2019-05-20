@@ -6,8 +6,6 @@ import ipdb
 import argparse
 import numpy as np
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerExample
-from DL.methods.linear_regression_sgd import LinearModelSGD
-from DL.methods.pilco_dynamics_learner import PilcoDynamicsLearner
 from DL.utils.data_loading import loadRobotData
 
 
@@ -67,19 +65,29 @@ if __name__ == "__main__":
             help="filename where the trained model will be saved if a trained"
             " model was not already provided in the command line.")
     args = parser.parse_args()
+
+    # TODO: make these command line arguments if needed.
+    history_length = 1
+    prediction_horizon = 1
     dynamics_learner = None
     if args.method == 'example':
         dynamics_learner = DynamicsLearnerExample(1, 1)
     elif args.method == 'pilco_ninducing_500_ntraining_50000':
+        from DL.methods.pilco_dynamics_learner import PilcoDynamicsLearner
+
         ninducing = 500
         ntraining = 50000
-        history_length = 1
-        prediction_horizon = 1
         dynamics_learner = PilcoDynamicsLearner(history_length,
                 prediction_horizon, ninducing, ntraining)
         print("Training Done")
     elif args.method == 'linear_model_sgd':
+        from DL.methods.linear_regression_sgd import LinearModelSGD
+
         dynamics_learner = LinearModelSGD(1, 1)
+    elif args.method == 'BNN':
+        from DL.methods.BNN import BNNLearner
+
+        dynamics_learner = BNNLearner(history_length, prediction_horizon)
     assert dynamics_learner, "Make sure the method is implemented."
     training_observations, training_actions = loadRobotData(args.training_data)
     testing_observations, testing_actions = loadRobotData(args.testing_data)
