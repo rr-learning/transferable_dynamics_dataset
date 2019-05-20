@@ -19,10 +19,9 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
     assert dynamics_learner.prediction_horizon in possible_prediction_horizons
 
     history_length = dynamics_learner.history_length
-    if dynamics_learner.prediction_horizon == 1:
-        prediction_horizons = possible_prediction_horizons
-    else:
-        prediction_horizons = [dynamics_learner.prediction_horizon]
+
+    # Only evaluating in the prediction horizon that a model was trained on.
+    prediction_horizons = [dynamics_learner.prediction_horizon]
 
     output_errors = {}
     for prediction_horizon in prediction_horizons:
