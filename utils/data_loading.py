@@ -25,6 +25,7 @@ def loadRobotData(filename):
     actions = data['constrained_torques']
     return observations, actions
 
+
 def concatenateActionsStates(history_actions, history_obs, future_actions):
     assert len(history_actions.shape) == 3
     assert len(history_obs.shape) == 3
@@ -61,11 +62,42 @@ def concatenateActionsStates(history_actions, history_obs, future_actions):
     assert joint_states_actions.shape[0] == history_obs.shape[0]
     return joint_states_actions
 
+
+def concatenateActionsStatesAverages(history_actions, history_obs, future_actions):
+    assert len(history_actions.shape) == 3
+    assert len(history_obs.shape) == 3
+    assert len(future_actions.shape) == 3
+    assert history_actions.shape[:2] == history_obs.shape[:2]
+    assert (history_actions.shape[0], history_actions.shape[2]) ==\
+            (future_actions.shape[0], future_actions.shape[2])
+    """
+    averages and concatenates observations and actions to form a single (row) vector. 
+    See also concatenateActionsStates()
+
+    Returns
+    -------
+
+    joint_states_actions: np array with shape 
+                      nsequences x (input dim + state dim + (prediction horizon - 1) * input_dim)
+    """
+    if future_actions.shape[1]>0:
+        joint_states_actions = [np.mean(history_actions, axis=1),
+                                np.mean(history_obs, axis=1),
+                                np.mean(future_actions, axis=1)]
+    else:
+        joint_states_actions = [np.mean(history_actions, axis=1),
+                                np.mean(history_obs, axis=1)]
+    joint_states_actions = np.hstack(joint_states_actions)
+    assert joint_states_actions.shape[0] == history_obs.shape[0]
+    return joint_states_actions
+
+
 def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
-        difference_learning):
+        difference_learning, average=False):
     """
     Receives sequences of observations and actions and returns training targets
     and training inputs that will be used to learn the dynamics model.
+    If average is True then the mean of the history and the mean of the future actions are used.
 
     Outputs
     -------
@@ -83,8 +115,10 @@ def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
         hist_act = actions_seqs[:, offset - history_len:offset, :]
         future_act = actions_seqs[:,offset: offset + prediction_horizon - 1, :]
         output_obs = obs_seqs[:,offset + prediction_horizon - 1, :]
-        current_input = concatenateActionsStates(hist_act, hist_obs,
-                future_act)
+        if average:
+            current_input = concatenateActionsStatesAverages(hist_act, hist_obs, future_act)
+        else:
+            current_input = concatenateActionsStates(hist_act, hist_obs, future_act)
         current_target = output_obs
         if difference_learning:
             current_target = current_target.copy() - hist_obs[:, -1, :]
