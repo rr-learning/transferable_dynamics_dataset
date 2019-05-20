@@ -42,11 +42,10 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
             true_observation = observation_sequences[:, t + prediction_horizon]
             errors[:, i] = observation_prediction - true_observation
 
-        errors_key = dynamics_learner.name() + '__history_' + \
-                str(history_length) + '__training_horizon_' + \
+        errors_key = test_dataset_name + '__history_' + str(history_length) + \
+                '__training_horizon_' + \
                 str(dynamics_learner.prediction_horizon) + \
-                '__evaluation_horizon_' + str(prediction_horizon) + '__' + \
-                test_dataset_name
+                '__evaluation_horizon_' + str(prediction_horizon)
         output_errors[errors_key] = errors
     return output_errors
 
