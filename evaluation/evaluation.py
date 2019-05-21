@@ -93,30 +93,32 @@ if __name__ == "__main__":
     parser.add_argument("--output_model",
             help="filename where the trained model will be saved if a trained"
             " model was not already provided in the command line.")
+    parser.add_argument("--averaging", action='store_true')
     args = parser.parse_args()
     history_length = args.history_length
     prediction_horizon = args.prediction_horizon
     dynamics_learner = None
     if args.method == 'example':
         dynamics_learner = DynamicsLearnerExample(history_length,
-                prediction_horizon, averaging=True)
+                prediction_horizon, averaging=args.averaging)
     elif args.method == 'pilco_ninducing_500_ntraining_50000':
         from DL.methods.pilco_dynamics_learner import PilcoDynamicsLearner
 
         ninducing = 500
         ntraining = 50000
         dynamics_learner = PilcoDynamicsLearner(history_length,
-                prediction_horizon, ninducing, ntraining, averaging=True)
+                prediction_horizon, ninducing, ntraining,
+                averaging=args.averaging)
     elif args.method == 'linear_model_ls':
         from DL.methods.linear_regression_ls import LinearModel
 
         dynamics_learner = LinearModel(history_length, prediction_horizon,
-            averaging=True)
+            averaging=args.averaging)
     elif args.method == 'linear_model_sgd':
         from DL.methods.linear_regression_sgd import LinearModelSGD
 
         dynamics_learner = LinearModelSGD(history_length, prediction_horizon,
-            averaging=True)
+            averaging=args.averaging)
     elif args.method == 'BNN':
         from DL.methods.BNN import BNNLearner
 
