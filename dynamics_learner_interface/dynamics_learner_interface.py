@@ -42,8 +42,12 @@ class DynamicsLearnerInterface(object):
         self._check_prediction_inputs(observation_history, action_history, action_future)
 
         # Making a single input from all the input parameters.
-        dynamics_inputs = concatenateActionsStates(action_history,
-                observation_history, action_future)
+        if self.averaging:
+            dynamics_inputs = concatenateActionsStatesAverages(action_history,
+                    observation_history, action_future)
+        else:
+            dynamics_inputs = concatenateActionsStates(action_history,
+                    observation_history, action_future)
 
         # Whitening the input.
         whitened_input = self.inputs_standardizer.standardize(dynamics_inputs)
