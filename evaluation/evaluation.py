@@ -59,16 +59,16 @@ if __name__ == "__main__":
             help="<Required> filename of the input robot testing data")
     parser.add_argument("--method", required=True,
             help="<Required> Name of the method that will be tested")
+    parser.add_argument("--history_length", type=int, default=1)
+    parser.add_argument("--prediction_horizon", type=int, default=1)
     parser.add_argument("--output_errors", required=True,
             help="<Required> filename where the computed errors will be saved")
     parser.add_argument("--output_model",
             help="filename where the trained model will be saved if a trained"
             " model was not already provided in the command line.")
     args = parser.parse_args()
-
-    # TODO: make these command line arguments if needed.
-    history_length = 1
-    prediction_horizon = 1
+    history_length = args.history_length
+    prediction_horizon = args.prediction_horizon
     dynamics_learner = None
     if args.method == 'example':
         dynamics_learner = DynamicsLearnerExample(1, 1)
@@ -79,7 +79,6 @@ if __name__ == "__main__":
         ntraining = 50000
         dynamics_learner = PilcoDynamicsLearner(history_length,
                 prediction_horizon, ninducing, ntraining)
-        print("Training Done")
     elif args.method == 'linear_model_sgd':
         from DL.methods.linear_regression_sgd import LinearModelSGD
 

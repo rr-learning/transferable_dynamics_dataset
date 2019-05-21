@@ -9,19 +9,20 @@ from DL.utils import unrollTrainingData, concatenateActionsStates, Standardizer
 class DynamicsLearnerInterface(object):
 
     def __init__(self, history_length, prediction_horizon,
-            difference_learning = True):
+            difference_learning = True, averaging = False):
         self.history_length = history_length
         self.prediction_horizon = prediction_horizon
         self.observation_dimension = 9
         self.action_dimension = 3
         self.difference_learning = difference_learning
+        self.averaging = averaging
 
     # do not override this function!
     def learn(self, observation_sequences, action_sequences):
         self._check_learning_inputs(observation_sequences, action_sequences)
         targets, inputs = unrollTrainingData(observation_sequences,
                 action_sequences, self.history_length, self.prediction_horizon,
-                self.difference_learning)
+                self.difference_learning, self.averaging)
 
         # Whitening the inputs.
         self.load_normalization_stats(observation_sequences, action_sequences)
@@ -162,7 +163,7 @@ class DynamicsLearnerInterface(object):
         self._check_learning_inputs(observation_sequences, action_sequences)
         targets, inputs = unrollTrainingData(observation_sequences,
                 action_sequences, self.history_length, self.prediction_horizon,
-                self.difference_learning)
+                self.difference_learning, self.averaging)
 
         # Loading the standardizers.
         self.targets_standardizer = Standardizer(targets)

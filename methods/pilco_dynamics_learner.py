@@ -12,8 +12,9 @@ from pilco.models import PILCO
 class PilcoDynamicsLearner(DynamicsLearnerInterface):
 
     def __init__(self, history_length, prediction_horizon, ninducing_points,
-            nsampled_training_points = None):
-        super().__init__(history_length, prediction_horizon)
+            nsampled_training_points = None, averaging = True):
+        super().__init__(history_length, prediction_horizon,
+                averaging=averaging)
         self.ninducing_points = ninducing_points
         self.nsampled_training_points = nsampled_training_points
 
