@@ -29,7 +29,7 @@ class EQL(DynamicsLearnerInterface):
                  model_train_params,
                  optional_params,
                  difference_learning = True):
-
+        super().__init__(history_length, prediction_horizon)
         self.eps = 1e-7
 
         self._parse_arch_params(**model_arch_params)
@@ -63,7 +63,6 @@ class EQL(DynamicsLearnerInterface):
                                                 model_dir=self.model_dir,
                                                 params=self.params)
         self.is_trained = False
-        super().__init__(history_length, prediction_horizon)
 
     def _parse_arch_params(self, num_h_layers, layer_width):
         self.num_h_layers = num_h_layers
@@ -147,32 +146,29 @@ class EQL(DynamicsLearnerInterface):
 
         prediction = self.model_fn.numba_expr(*(single_input.T))
         prediction = np.asarray(prediction).T
+        prediction = prediction[np.newaxis, :]
         return prediction
 
     def name(self):
         return 'EQL' #TODO: change to attribute
 
-    def save(self, filename, norm_file=None):
+    def save(self, model_filename):
         """
         Parameters
         ----------
         filename:   string used as filename to load a model.
         """
-        if norm_file is not None:
-            super().save(norm_file)
         exprs = [self.model_fn.sympy_expr, self.model_fn.numba_expr]
 
-        with open(filename, 'wb') as handle:
+        with open(model_filename, 'wb') as handle:
             pickle.dump(exprs, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def load(self, filename, norm_file=None):
+    def load(self, model_filename):
         """
         Parameters
         ----------
         filename:   string used as filename to save a model.
         """
-        if norm_file is not None:
-            super().load(norm_file)
-        with open(filename, 'rb') as handle:
+        with open(model_filename, 'rb') as handle:
             exprs = pickle.load(handle)
         self.model_fn.sympy_expr, self.model_fn.numba_expr = exprs

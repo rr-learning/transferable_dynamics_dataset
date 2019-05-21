@@ -3,7 +3,8 @@ import sys
 import ipdb
 import traceback
 from collections import defaultdict
-from DL.utils import unrollTrainingData, concatenateActionsStates, Standardizer
+from DL.utils import unrollTrainingData, concatenateActionsStates, \
+        Standardizer, concatenateActionsStatesAverages
 
 
 class DynamicsLearnerInterface(object):
@@ -183,6 +184,9 @@ class DynamicsLearnerInterface(object):
 
 
 class DynamicsLearnerExample(DynamicsLearnerInterface):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def name(self):
         return 'dynamics_learner_example'

@@ -98,18 +98,20 @@ if __name__ == "__main__":
     prediction_horizon = args.prediction_horizon
     dynamics_learner = None
     if args.method == 'example':
-        dynamics_learner = DynamicsLearnerExample(1, 1)
+        dynamics_learner = DynamicsLearnerExample(history_length,
+                prediction_horizon, averaging=True)
     elif args.method == 'pilco_ninducing_500_ntraining_50000':
         from DL.methods.pilco_dynamics_learner import PilcoDynamicsLearner
 
         ninducing = 500
         ntraining = 50000
         dynamics_learner = PilcoDynamicsLearner(history_length,
-                prediction_horizon, ninducing, ntraining)
+                prediction_horizon, ninducing, ntraining, averaging=True)
     elif args.method == 'linear_model_sgd':
         from DL.methods.linear_regression_sgd import LinearModelSGD
 
-        dynamics_learner = LinearModelSGD(1, 1)
+        dynamics_learner = LinearModelSGD(history_length, prediction_horizon,
+            averaging=True)
     elif args.method == 'BNN':
         from DL.methods.BNN import BNNLearner
 
