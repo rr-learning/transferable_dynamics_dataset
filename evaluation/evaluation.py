@@ -154,12 +154,6 @@ if __name__ == "__main__":
         dynamics_learner.learn(training_observations, training_actions)
         if args.output_model:
             dynamics_learner.save(args.output_model)
-<<<<<<< HEAD
-    errors = evaluate(dynamics_learner, testing_observations,
-            testing_actions, args.testing_data)
-    print(compute_RMSE_from_errors(errors))
-    np.savez(args.output_errors, **errors)
-=======
 
     # Maps each data set to its corresponding error file.
     set_to_errors = {}
@@ -192,5 +186,3 @@ if __name__ == "__main__":
         print("Validation error:")
         print(compute_RMSE_from_errors(errors))
     np.savez(args.output_errors, **set_to_errors)
-
->>>>>>> 95dc409020932d62ca38bb49fdff593b212f89b1
