@@ -107,6 +107,11 @@ if __name__ == "__main__":
         ntraining = 50000
         dynamics_learner = PilcoDynamicsLearner(history_length,
                 prediction_horizon, ninducing, ntraining, averaging=True)
+    elif args.method == 'linear_model_ls':
+        from DL.methods.linear_regression_ls import LinearModel
+
+        dynamics_learner = LinearModel(history_length, prediction_horizon,
+            averaging=True)
     elif args.method == 'linear_model_sgd':
         from DL.methods.linear_regression_sgd import LinearModelSGD
 
