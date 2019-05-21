@@ -16,7 +16,7 @@ class LinearModelSGD(DynamicsLearnerInterface):
         self.models_ = []
         for i in range(self.observation_dimension):
             self.models_.append(linear_model.SGDRegressor(
-                verbose=1, max_iter=10000000))
+                verbose=0, max_iter=10000000))
 
     def _learn(self, training_inputs, training_targets):
         for i in range(self.observation_dimension):
