@@ -11,13 +11,15 @@ from DL import DynamicsLearnerInterface
 class BNNLearner(DynamicsLearnerInterface):
     def __init__(self, history_length, prediction_horizon,
                  difference_learning = True, learning_rate=0.1,
-                 optim_epochs=400, hidden_units=[100, 100],
+                 optim_epochs=4, # TODO: redo 400
+                 hidden_units=[100, 100],
                  prior_mean=0, prior_std=1):
-        self.history_length = history_length
-        self.prediction_horizon = prediction_horizon
-        self.observation_dimension = 9
-        self.action_dimension = 3
-        self.difference_learning = difference_learning
+        super().__init__(history_length, prediction_horizon)
+#        self.history_length = history_length
+#        self.prediction_horizon = prediction_horizon
+#        self.observation_dimension = 9
+#        self.action_dimension = 3
+#        self.difference_learning = difference_learning
         # BNN tuning parameters
         self.learning_rate = learning_rate
         self.optim_epochs = optim_epochs
@@ -25,14 +27,14 @@ class BNNLearner(DynamicsLearnerInterface):
         self.prior_mean = prior_mean
         self.prior_std = prior_std
         # create models
-        self.input_dim = self.history_length*(self.observations_dimension + self.action_dimension)
-        self.output_dim = self.observation_dim
+        self.input_dim = self.history_length*(self.observation_dimension + self.action_dimension)
+        self.output_dim = self.observation_dimension
         self.models_ = []
-        self.optims = []
+        self.optims_ = []
         for i in range(self.observation_dimension):
             # create model and append to model list
             layers = []
-            input_layer = BNNLayer(self.input_dimension,
+            input_layer = BNNLayer(self.input_dim,
                                    self.hidden_units[0],
                                    activation='relu',
                                    prior_mean=self.prior_mean,
@@ -46,7 +48,7 @@ class BNNLearner(DynamicsLearnerInterface):
                                        prior_rho=self.prior_std))
                 print("more layers")
             output_layer = BNNLayer(self.hidden_units[-1],
-                                    self.output_dim,
+                                    1,
                                     activation='none',
                                     prior_mean=self.prior_mean,
                                     prior_rho=self.prior_std)
@@ -61,21 +63,28 @@ class BNNLearner(DynamicsLearnerInterface):
         return "BNN"        
 
     def _learn(self, training_inputs, training_targets):
+        Var = lambda x, dtype=torch.FloatTensor: Variable(torch.from_numpy(x).type(dtype))
+        training_inputs = Var(training_inputs)
+        training_targets = Var(training_targets)
+#        print(training_inputs.size())
+#        print(training_targets[:, 1].reshape((-1, 1)).shape)
         for i in range(self.observation_dimension):
             for i_ep in range(self.optim_epochs):
                 kl, lg_lklh = self.models_[i].Forward(
-                    training_inputs, training_targets[:, i], 1, 'Gaussian')
+                    training_inputs, training_targets[:, i].reshape((-1, 1)), 1, 'Gaussian')
                 loss = BNN.loss_fn(kl, lg_lklh, 1)
                 self.optims_[i].zero_grad()
                 loss.backward()
                 self.optims_[i].step()
+                print("{}.{} / {}.{}".format(i, i_ep, self.observation_dimension, self.optim_epochs))
 
     def _predict(self, inputs):
+        print("Start prediction")
         prediction = np.zeros((inputs.shape[0], self.observation_dimension))
         Var = lambda x, dtype=torch.FloatTensor: Variable(torch.from_numpy(x).type(dtype))
         X_ = Var(inputs)
         for i, model in enumerate(self.models_):
-            pred_lst = [model.forward(X_, mode='MC').data.numpy() for _ in range(500)]
+            pred_lst = [model.forward(X_, mode='MC').data.numpy() for _ in range(40)]
             pred = np.array(pred_lst).T            
             prediction[:, i] = pred.mean(axis=2)
         return prediction
