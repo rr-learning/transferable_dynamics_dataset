@@ -82,6 +82,8 @@ if __name__ == "__main__":
     parser.add_argument("--trained_model",
             help="filename of a trained model. If specified the model won't be"
             " trained")
+    parser.add_argument("--settings",
+            help="filename where the model settings are stored")
     parser.add_argument("--validation_data",
             help="filename of the input robot validation data")
     parser.add_argument("--iid_test_data",
