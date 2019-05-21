@@ -93,7 +93,9 @@ if __name__ == "__main__":
     parser.add_argument("--output_model",
             help="filename where the trained model will be saved if a trained"
             " model was not already provided in the command line.")
-    parser.add_argument("--averaging", action='store_true')
+    parser.add_argument("--averaging", dest='averaging', action='store_true')
+    parser.add_argument("--no-averaging", dest='averaging', action='store_false')
+    parser.set_defaults(averaging=False)
     args = parser.parse_args()
     history_length = args.history_length
     prediction_horizon = args.prediction_horizon
