@@ -58,18 +58,18 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
                 str(dynamics_learner.prediction_horizon) + \
                 '__evaluation_horizon_' + str(prediction_horizon)
         output_errors[errors_key] = errors
-    return output_errors
 
-def compute_RMSE_from_errors(output_errors):
+    # Right now we only test on the same setup used for training.
+    # Therefore, there must be only one entry in the dictionary.
+    errors_to_return = list(output_errors.values())
+    assert len(errors_to_return) == 1
+    return errors_to_return[0]
+
+def compute_RMSE_from_errors(errors):
     """
     Computes the RMSE from the error vectors. For now it weights equally
     all the dimensions.
     """
-    errors = list(output_errors.values())
-
-    # Right now we only test on the same setup used for training.
-    assert len(errors) == 1
-    errors = errors[0]
     nseq, length, state_dim = errors.shape
     errors = errors.reshape((-1, state_dim))
     squared_errors = np.sum(errors * errors, axis=1)
@@ -83,8 +83,12 @@ if __name__ == "__main__":
     parser.add_argument("--trained_model",
             help="filename of a trained model. If specified the model won't be"
             " trained")
-    parser.add_argument("--testing_data", required=True,
-            help="<Required> filename of the input robot testing data")
+    parser.add_argument("--validation_data",
+            help="filename of the input robot validation data")
+    parser.add_argument("--iid_test_data",
+            help="filename of the input robot iid testing data")
+    parser.add_argument("--transfer_test_data",
+            help="filename of the input robot transfer testing data")
     parser.add_argument("--method", required=True,
             help="<Required> Name of the method that will be tested")
     parser.add_argument("--history_length", type=int, default=1)
@@ -94,7 +98,9 @@ if __name__ == "__main__":
     parser.add_argument("--output_model",
             help="filename where the trained model will be saved if a trained"
             " model was not already provided in the command line.")
-    parser.add_argument("--averaging", action='store_true')
+    parser.add_argument("--averaging", dest='averaging', action='store_true')
+    parser.add_argument("--no-averaging", dest='averaging', action='store_false')
+    parser.set_defaults(averaging=False)
     args = parser.parse_args()
     history_length = args.history_length
     prediction_horizon = args.prediction_horizon
@@ -138,7 +144,6 @@ if __name__ == "__main__":
                                    mode=params['mode'])
     assert dynamics_learner, "Make sure the method is implemented."
     training_observations, training_actions = loadRobotData(args.training_data)
-    testing_observations, testing_actions = loadRobotData(args.testing_data)
     if args.trained_model:
         dynamics_learner.load_normalization_stats(training_observations,
                 training_actions)
@@ -147,7 +152,43 @@ if __name__ == "__main__":
         dynamics_learner.learn(training_observations, training_actions)
         if args.output_model:
             dynamics_learner.save(args.output_model)
+<<<<<<< HEAD
     errors = evaluate(dynamics_learner, testing_observations,
             testing_actions, args.testing_data)
     print(compute_RMSE_from_errors(errors))
     np.savez(args.output_errors, **errors)
+=======
+
+    # Maps each data set to its corresponding error file.
+    set_to_errors = {}
+    set_to_errors['training'] = evaluate(dynamics_learner, training_observations,
+            training_actions, args.training_data)
+    print("Training error:")
+    print(compute_RMSE_from_errors(set_to_errors['training']))
+    if args.iid_test_data:
+        testing_observations, testing_actions = loadRobotData(
+                args.iid_test_data)
+        errors = evaluate(dynamics_learner, testing_observations,
+                testing_actions, args.iid_test_data)
+        set_to_errors['iid'] = errors
+        print("IID test error:")
+        print(compute_RMSE_from_errors(errors))
+    if args.transfer_test_data:
+        testing_observations, testing_actions = loadRobotData(
+                args.transfer_test_data)
+        errors = evaluate(dynamics_learner, testing_observations,
+                testing_actions, args.transfer_test_data)
+        set_to_errors['transfer'] = errors
+        print("Transfer test error:")
+        print(compute_RMSE_from_errors(errors))
+    if args.validation_data:
+        testing_observations, testing_actions = loadRobotData(
+                args.validation_data)
+        errors = evaluate(dynamics_learner, testing_observations,
+                testing_actions, args.validation_data)
+        set_to_errors['validation'] = errors
+        print("Validation error:")
+        print(compute_RMSE_from_errors(errors))
+    np.savez(args.output_errors, **set_to_errors)
+
+>>>>>>> 95dc409020932d62ca38bb49fdff593b212f89b1
