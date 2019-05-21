@@ -2,6 +2,7 @@
 Evaluation functionality. Note that it can also be called as a script.
 """
 import os
+import json
 import ipdb
 import argparse
 import numpy as np
@@ -131,6 +132,18 @@ if __name__ == "__main__":
         from DL.methods.BNN import BNNLearner
 
         dynamics_learner = BNNLearner(history_length, prediction_horizon)
+    elif args.method == 'NN':
+        from DL.methods.nn_dynamics_learner import NNDynamicsLearner
+        settings_file = "./Settings/nn_prediction_horizon_{0}_history_length_{1}.json".format(prediction_horizon, history_length)
+        exists = os.path.isfile(settings_file)
+        if exists:
+            with open(settings_file, 'r') as f:
+                params = json.load(f)
+            dynamics_learner = NNDynamicsLearner(history_length=history_length,
+                                   prediction_horizon=prediction_horizon,
+                                   model_arch_params=params["model_arch_params"],
+                                   model_train_params=params["model_train_params"],
+                                   mode=params['mode'])
     assert dynamics_learner, "Make sure the method is implemented."
     training_observations, training_actions = loadRobotData(args.training_data)
     if args.trained_model:
@@ -141,6 +154,12 @@ if __name__ == "__main__":
         dynamics_learner.learn(training_observations, training_actions)
         if args.output_model:
             dynamics_learner.save(args.output_model)
+<<<<<<< HEAD
+    errors = evaluate(dynamics_learner, testing_observations,
+            testing_actions, args.testing_data)
+    print(compute_RMSE_from_errors(errors))
+    np.savez(args.output_errors, **errors)
+=======
 
     # Maps each data set to its corresponding error file.
     set_to_errors = {}
@@ -174,3 +193,4 @@ if __name__ == "__main__":
         print(compute_RMSE_from_errors(errors))
     np.savez(args.output_errors, **set_to_errors)
 
+>>>>>>> 95dc409020932d62ca38bb49fdff593b212f89b1
