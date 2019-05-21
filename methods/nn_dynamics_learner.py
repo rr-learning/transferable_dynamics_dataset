@@ -24,15 +24,15 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
                  mode):
 
 
-        self.input_dim = 12
+        self.input_dim = 3 * (prediction_horizon - 1) + history_length * 12
         self.output_dim = 9
 
         self._parse_arch_params(**model_arch_params)
         if mode == "train":
+            super().__init__(history_length, prediction_horizon)
             self._parse_train_params(**model_train_params)
             self.model = Sequential()
             self.build()
-        super().__init__(history_length, prediction_horizon)
 
     def name(self):
         return 'NN' #TODO: change to attribute
@@ -58,7 +58,13 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
         self.model.add(Dense(units=self.output_dim, input_dim=all_dims[-1], activation=None))
 
         self.model.compile(optimizer=self.optimizer, loss=self.loss)
-        self.tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
+        self.tensorboard = TensorBoard(log_dir="logs/history_length_{4}_prediction_horizon_{5}_n_{0}_m_{1}_l2_reg_{3}_Adam_lr_{2}_bs_512_epochs_400_{4}".format(self.num_layers,
+                                                                                 self.size,
+                                                                                 self.learning_rate,
+                                                                                 self.l2_reg,
+                                                                                 self.history_length,
+                                                                                 self.prediction_horizon,
+                                                                                 time()))
 
     def _learn(self, training_inputs, training_targets):
         """
@@ -72,7 +78,7 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
                                 denoting the targets of the dynamics model.
         """
         self.model.fit(x=training_inputs, y=training_targets, batch_size=self.batch_size, epochs=self.epochs,
-                       validation_split=self.validation_split, shuffle=True, callbacks=[self.tensorboard])
+                       validation_split=self.validation_split, shuffle=False, callbacks=[self.tensorboard])
 
     def _predict(self, single_input):
         """
@@ -84,7 +90,7 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
                                 the history length and prediction horizon)
         Outputs
         ----------
-        observation_prediction: two dimensional np-array  shape: (1, observation_dimension)
+        observation_prediction: two dimensional np-array  shape: (n_examples, observation_dimension)
                                 corresponding the prediction for the observation
                                 after 1 step.
 
@@ -94,16 +100,12 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
         deltas = self.model.predict(single_input)
         return deltas
 
-    def save(self, model_file, norm_file=None):
-        if norm_file is not None:
-            super().save(norm_file)
-        self.model.save(model_file)
+    def save(self, model_filename):
+        self.model.save(model_filename)
 
 
-    def load(self, model_file, norm_file=None):
-        if norm_file is not None:
-            super().load(norm_file)
-        self.model = load_model(model_file)
+    def load(self, model_filename):
+        self.model = load_model(model_filename)
 
 
 def optimizer_from_string(opt_str):
