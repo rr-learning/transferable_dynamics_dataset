@@ -6,8 +6,15 @@ import ipdb
 import argparse
 import numpy as np
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerExample
+from DL.utils import Standardizer
 from DL.utils.data_loading import loadRobotData
 
+
+def get_observations_standardizer(testing_observations):
+    assert len(testing_observations.shape) == 3
+    joint_testing_obs = testing_observations.reshape((-1,
+            testing_observations.shape[2]))
+    return Standardizer(joint_testing_obs)
 
 def evaluate(dynamics_learner, observation_sequences, action_sequences,
         test_dataset_name):
@@ -17,6 +24,10 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
     assert dynamics_learner.prediction_horizon in possible_prediction_horizons
 
     history_length = dynamics_learner.history_length
+
+    # Computing normalization statistics for the observed states in testing set.
+    # This way we make sure all the error dimensions have the same scale.
+    obs_standardizer = get_observations_standardizer(observation_sequences)
 
     # Only evaluating in the prediction horizon that a model was trained on.
     prediction_horizons = [dynamics_learner.prediction_horizon]
@@ -38,7 +49,8 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
                     action_history=action_history,
                     action_future=action_future)
             true_observation = observation_sequences[:, t + prediction_horizon]
-            errors[:, i] = observation_prediction - true_observation
+            errors[:, i] = obs_standardizer.standardize(true_observation) - \
+                    obs_standardizer.standardize(observation_prediction)
 
         errors_key = test_dataset_name + '__history_' + str(history_length) + \
                 '__training_horizon_' + \
@@ -46,6 +58,21 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
                 '__evaluation_horizon_' + str(prediction_horizon)
         output_errors[errors_key] = errors
     return output_errors
+
+def compute_RMSE_from_errors(output_errors):
+    """
+    Computes the RMSE from the error vectors. For now it weights equally
+    all the dimensions.
+    """
+    errors = list(output_errors.values())
+
+    # Right now we only test on the same setup used for training.
+    assert len(errors) == 1
+    errors = errors[0]
+    nseq, length, state_dim = errors.shape
+    errors = errors.reshape((-1, state_dim))
+    squared_errors = np.sum(errors * errors, axis=1)
+    return np.sqrt(np.mean(squared_errors))
 
 
 if __name__ == "__main__":
@@ -100,5 +127,6 @@ if __name__ == "__main__":
             dynamics_learner.save(args.output_model)
     errors = evaluate(dynamics_learner, testing_observations,
             testing_actions, args.testing_data)
+    print(compute_RMSE_from_errors(errors))
     np.savez(args.output_errors, **errors)
 
