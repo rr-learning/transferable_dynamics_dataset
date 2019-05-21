@@ -10,8 +10,9 @@ from sklearn import linear_model
 
 class LinearModelSGD(DynamicsLearnerInterface):
 
-    def __init__(self, history_length, prediction_horizon):
-        super().__init__(history_length, prediction_horizon)
+    def __init__(self, history_length, prediction_horizon, averaging):
+        super().__init__(history_length, prediction_horizon,
+                averaging=averaging)
         self.models_ = []
         for i in range(self.observation_dimension):
             self.models_.append(linear_model.SGDRegressor(
