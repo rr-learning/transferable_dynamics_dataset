@@ -1,7 +1,6 @@
-""" 
-Learning dynamics using sparse Gaussian process regression (SGPR) as in PILCO.
-The GP training inputs and training targets are directly taken from the
-observed state and action values.
+"""
+Using the implementation of scalable GPs using SVI available in GPflow which is
+based on the paper Gaussian Processes for Big Data (Hensman et al. 2013).
 """
 
 import argparse
@@ -60,13 +59,13 @@ class SVGPR(DynamicsLearnerInterface):
         # Create an Adam Optimiser action
         adam = gpflow.train.AdamOptimizer().make_optimize_action(model)
         # Create a Logger action
-        logger = self.Logger(model)
-        actions = [adam, logger]
+        self.logger = self.Logger(model)
+        actions = [adam, self.logger]
         # Create optimisation loop that interleaves Adam with Logger
         loop = gpflow.actions.Loop(actions, stop=iterations)()
         # Bind current TF session to model
         model.anchor(model.enquire_session())
-        return logger
+        return self.logger
 
     def name(self):
         return "SVGPR"
@@ -78,6 +77,14 @@ if __name__ == "__main__":
             help="<Required> filename of the input robot data")
     args = parser.parse_args()
     observations, actions = loadRobotData(args.data_filename)
-    dynamics_model = SVGPR(1, 1, ninducing_points = 10, minibatch_size=10)
+    dynamics_model = SVGPR(1, 1, ninducing_points = 10, minibatch_size=1000)
     dynamics_model.learn(observations, actions)
     print(dynamics_model.name())
+
+    # Plotting the ELBO during optimzation.
+    import matplotlib.pyplot as plt
+    plt.plot(-np.array(dynamics_model.logger.logf))
+    plt.xlabel('iteration')
+    plt.ylabel('ELBO')
+    plt.show()
+
