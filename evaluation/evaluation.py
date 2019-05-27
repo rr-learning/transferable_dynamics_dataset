@@ -21,10 +21,6 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
 
     history_length = dynamics_learner.history_length
 
-    # Computing normalization statistics for the observed states in testing set.
-    # This way we make sure all the error dimensions have the same scale.
-    obs_standardizer = get_observations_standardizer(observation_sequences)
-
     # Only evaluating in the prediction horizon that a model was trained on.
     prediction_horizons = [dynamics_learner.prediction_horizon]
 
