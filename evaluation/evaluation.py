@@ -12,12 +12,6 @@ from DL.utils import Standardizer
 from DL.utils.data_loading import loadRobotData
 
 
-def get_observations_standardizer(testing_observations):
-    assert len(testing_observations.shape) == 3
-    joint_testing_obs = testing_observations.reshape((-1,
-            testing_observations.shape[2]))
-    return Standardizer(joint_testing_obs)
-
 def evaluate(dynamics_learner, observation_sequences, action_sequences,
         test_dataset_name, verbose=False):
     possible_history_lengths = [1, 10]
@@ -52,8 +46,7 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
                     action_history=action_history,
                     action_future=action_future)
             true_observation = observation_sequences[:, t + prediction_horizon]
-            errors[:, i] = obs_standardizer.standardize(true_observation) - \
-                    obs_standardizer.standardize(observation_prediction)
+            errors[:, i] = true_observation - observation_prediction
             if verbose:
                 print('Elapsed time for each predict call {}'.format(
                     time.perf_counter() - start_time))
@@ -70,10 +63,18 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
     assert len(errors_to_return) == 1
     return errors_to_return[0]
 
+def get_angle_errors(errors):
+    """
+    Takes error vectors computed over full state predictions and picks the
+    dimensions corresponding to angle predictions. Notice that it is assumed
+    that the first three dimenions contain angle errors.
+    """
+    return errors[:,:, :3]
+
 def compute_RMSE_from_errors(errors):
     """
-    Computes the RMSE from the error vectors. For now it weights equally
-    all the dimensions.
+    Computes the RMSE from the error vectors. Notice that it weights equally
+    all dimensions.
     """
     nseq, length, state_dim = errors.shape
     errors = errors.reshape((-1, state_dim))
@@ -182,34 +183,19 @@ if __name__ == "__main__":
         if args.output_model:
             dynamics_learner.save(args.output_model)
 
+    datasets = ['training_data', 'iid_test_data', 'transfer_test_data',
+            'validation_data']
+
     # Maps each data set to its corresponding error file.
     set_to_errors = {}
-    set_to_errors['training'] = evaluate(dynamics_learner, training_observations,
-            training_actions, args.training_data)
-    print("Training error:")
-    print(compute_RMSE_from_errors(set_to_errors['training']))
-    if args.iid_test_data:
-        testing_observations, testing_actions = loadRobotData(
-                args.iid_test_data)
-        errors = evaluate(dynamics_learner, testing_observations,
-                testing_actions, args.iid_test_data, verbose=args.verbose)
-        set_to_errors['iid'] = errors
-        print("IID test error:")
-        print(compute_RMSE_from_errors(errors))
-    if args.transfer_test_data:
-        testing_observations, testing_actions = loadRobotData(
-                args.transfer_test_data)
-        errors = evaluate(dynamics_learner, testing_observations,
-                testing_actions, args.transfer_test_data, verbose=args.verbose)
-        set_to_errors['transfer'] = errors
-        print("Transfer test error:")
-        print(compute_RMSE_from_errors(errors))
-    if args.validation_data:
-        testing_observations, testing_actions = loadRobotData(
-                args.validation_data)
-        errors = evaluate(dynamics_learner, testing_observations,
-                testing_actions, args.validation_data, verbose=args.verbose)
-        set_to_errors['validation'] = errors
-        print("Validation error:")
-        print(compute_RMSE_from_errors(errors))
+    for dataset in datasets:
+        dataset_path = getattr(args, dataset)
+        if dataset_path:
+            testing_observations, testing_actions = loadRobotData(dataset_path)
+            errors = evaluate(dynamics_learner, testing_observations,
+                    testing_actions, dataset, verbose=args.verbose)
+            set_to_errors[dataset] = errors
+            print("{} error:".format(dataset))
+            angle_errors = get_angle_errors(errors)
+            print(compute_RMSE_from_errors(angle_errors))
     np.savez(args.output_errors, **set_to_errors)
