@@ -6,6 +6,7 @@ import json
 import ipdb
 import argparse
 import numpy as np
+import time
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerExample
 from DL.utils import Standardizer
 from DL.utils.data_loading import loadRobotData
@@ -18,7 +19,7 @@ def get_observations_standardizer(testing_observations):
     return Standardizer(joint_testing_obs)
 
 def evaluate(dynamics_learner, observation_sequences, action_sequences,
-        test_dataset_name):
+        test_dataset_name, verbose=False):
     possible_history_lengths = [1, 10]
     possible_prediction_horizons = [1, 10, 100, 1000]
     assert dynamics_learner.history_length in possible_history_lengths
@@ -41,6 +42,7 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
                            len(T),
                            observation_sequences.shape[2]))
         for i in range(len(T)):
+            start_time = time.perf_counter()
             t = T[i]
             observation_history = observation_sequences[:, t + 1 - history_length: t + 1]
             action_history = action_sequences[:, t + 1 - history_length: t + 1]
@@ -52,6 +54,9 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
             true_observation = observation_sequences[:, t + prediction_horizon]
             errors[:, i] = obs_standardizer.standardize(true_observation) - \
                     obs_standardizer.standardize(observation_prediction)
+            if verbose:
+                print('Elapsed time for each predict call {}'.format(
+                    time.perf_counter() - start_time))
 
         errors_key = test_dataset_name + '__history_' + str(history_length) + \
                 '__training_horizon_' + \
@@ -102,6 +107,7 @@ if __name__ == "__main__":
             " model was not already provided in the command line.")
     parser.add_argument("--averaging", dest='averaging', action='store_true')
     parser.add_argument("--no-averaging", dest='averaging', action='store_false')
+    parser.add_argument("--verbose", action='store_true')
     parser.set_defaults(averaging=False)
     args = parser.parse_args()
     history_length = args.history_length
@@ -186,7 +192,7 @@ if __name__ == "__main__":
         testing_observations, testing_actions = loadRobotData(
                 args.iid_test_data)
         errors = evaluate(dynamics_learner, testing_observations,
-                testing_actions, args.iid_test_data)
+                testing_actions, args.iid_test_data, verbose=args.verbose)
         set_to_errors['iid'] = errors
         print("IID test error:")
         print(compute_RMSE_from_errors(errors))
@@ -194,7 +200,7 @@ if __name__ == "__main__":
         testing_observations, testing_actions = loadRobotData(
                 args.transfer_test_data)
         errors = evaluate(dynamics_learner, testing_observations,
-                testing_actions, args.transfer_test_data)
+                testing_actions, args.transfer_test_data, verbose=args.verbose)
         set_to_errors['transfer'] = errors
         print("Transfer test error:")
         print(compute_RMSE_from_errors(errors))
@@ -202,7 +208,7 @@ if __name__ == "__main__":
         testing_observations, testing_actions = loadRobotData(
                 args.validation_data)
         errors = evaluate(dynamics_learner, testing_observations,
-                testing_actions, args.validation_data)
+                testing_actions, args.validation_data, verbose=args.verbose)
         set_to_errors['validation'] = errors
         print("Validation error:")
         print(compute_RMSE_from_errors(errors))
