@@ -12,6 +12,20 @@ from DL.utils import loadRobotData
 
 class SVGPR(DynamicsLearnerInterface):
 
+
+    class Logger(gpflow.actions.Action):
+        def __init__(self, model):
+            self.model = model
+            self.logf = []
+
+        def run(self, ctx):
+            if (ctx.iteration % 10) == 0:
+                # Extract likelihood tensor from Tensorflow session
+                likelihood = - ctx.session.run(self.model.likelihood_tensor)
+                # Append likelihood value to list
+                self.logf.append(likelihood)
+
+
     def __init__(self, history_length, prediction_horizon,
             ninducing_points, minibatch_size, averaging=True):
         super().__init__(history_length, prediction_horizon,
@@ -22,20 +36,37 @@ class SVGPR(DynamicsLearnerInterface):
     def _learn(self, training_inputs, training_targets):
         kern = gpflow.kernels.RBF(input_dim=training_inputs.shape[1],
                 ARD=True)
+        # TODO: Make Z a subset of the training data.
         Z = np.random.rand(self.ninducing_points, training_inputs.shape[1])
         self.model_ = gpflow.models.SVGP(training_inputs,
-                training_targets, kern, gpflow.likelihoods.Gaussian(),
-                Z=Z, minibatch_size=self.minibatch_size)
-        # TODO: optimization.
-        #pt = gpflow.train.ScipyOptimizer()
-        #print(self.model.compute_log_likelihood())
-        #opt.minimize(self.model, disp=True, maxiter=200)
-        #print(self.model.compute_log_likelihood())
+                training_targets, kern, gpflow.likelihoods.Gaussian(), Z,
+                minibatch_size=self.minibatch_size)
+        print('Initial loglikelihood: ', self.model_.compute_log_likelihood())
+        self.logger_ = self.run_adam_(self.model_, iterations=10000)
+        print('Trained loglikelihood: ', self.model_.compute_log_likelihood())
 
     def _predict(self, inputs):
         assert self.model_, "a trained model must be available"
         mean, _ = self.model_.predict_f(inputs)
         return mean
+
+    def run_adam_(self, model, iterations):
+        """
+        Utility function running the Adam Optimiser interleaved with a `Logger` action.
+
+        :param model: GPflow model
+        :param interations: number of iterations
+        """
+        # Create an Adam Optimiser action
+        adam = gpflow.train.AdamOptimizer().make_optimize_action(model)
+        # Create a Logger action
+        logger = self.Logger(model)
+        actions = [adam, logger]
+        # Create optimisation loop that interleaves Adam with Logger
+        loop = gpflow.actions.Loop(actions, stop=iterations)()
+        # Bind current TF session to model
+        model.anchor(model.enquire_session())
+        return logger
 
     def name(self):
         return "SVGPR"
