@@ -18,30 +18,37 @@ class SVGPR(DynamicsLearnerInterface):
             self.logf = []
 
         def run(self, ctx):
-            if (ctx.iteration % 10) == 0:
+            if (ctx.iteration % 100) == 0:
                 # Extract likelihood tensor from Tensorflow session
                 likelihood = - ctx.session.run(self.model.likelihood_tensor)
                 # Append likelihood value to list
+                print("Iteration {} loglikelihood {}".format(ctx.iteration,
+                        likelihood))
                 self.logf.append(likelihood)
 
 
     def __init__(self, history_length, prediction_horizon,
-            ninducing_points, minibatch_size, averaging=True):
+            ninducing_points, minibatch_size, niterations, averaging=True):
         super().__init__(history_length, prediction_horizon,
                 averaging=averaging)
         self.ninducing_points = ninducing_points
         self.minibatch_size = minibatch_size
+        self.niterations = niterations
 
     def _learn(self, training_inputs, training_targets):
-        kern = gpflow.kernels.RBF(input_dim=training_inputs.shape[1],
-                ARD=True)
-        # TODO: Make Z a subset of the training data.
-        Z = np.random.rand(self.ninducing_points, training_inputs.shape[1])
+        ntraining, input_dim  = training_inputs.shape
+        kern = gpflow.kernels.RBF(input_dim=input_dim, ARD=True)
+
+        Z = training_inputs[np.random.permutation(
+                ntraining)[:self.ninducing_points]].copy()
+        assert Z.shape == (self.ninducing_points, input_dim)
+
+        # Alternatively we can explicitly have one model per dimension.
         self.model_ = gpflow.models.SVGP(training_inputs,
                 training_targets, kern, gpflow.likelihoods.Gaussian(), Z,
                 minibatch_size=self.minibatch_size)
         print('Initial loglikelihood: ', self.model_.compute_log_likelihood())
-        self.logger_ = self.run_adam_(self.model_, iterations=10000)
+        self.logger_ = self.run_adam_()
         print('Trained loglikelihood: ', self.model_.compute_log_likelihood())
 
     def _predict(self, inputs):
@@ -49,7 +56,7 @@ class SVGPR(DynamicsLearnerInterface):
         mean, _ = self.model_.predict_f(inputs)
         return mean
 
-    def run_adam_(self, model, iterations):
+    def run_adam_(self):
         """
         Utility function running the Adam Optimiser interleaved with a `Logger` action.
 
@@ -57,14 +64,14 @@ class SVGPR(DynamicsLearnerInterface):
         :param interations: number of iterations
         """
         # Create an Adam Optimiser action
-        adam = gpflow.train.AdamOptimizer().make_optimize_action(model)
+        adam = gpflow.train.AdamOptimizer().make_optimize_action(self.model_)
         # Create a Logger action
-        self.logger = self.Logger(model)
+        self.logger = self.Logger(self.model_)
         actions = [adam, self.logger]
         # Create optimisation loop that interleaves Adam with Logger
-        loop = gpflow.actions.Loop(actions, stop=iterations)()
+        loop = gpflow.actions.Loop(actions, stop=self.niterations)()
         # Bind current TF session to model
-        model.anchor(model.enquire_session())
+        self.model_.anchor(self.model_.enquire_session())
         return self.logger
 
     def name(self):
@@ -75,6 +82,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_filename", required=True,
             help="<Required> filename of the input robot data")
+    parser.add_argument("--plot", action='store_true')
     args = parser.parse_args()
     observations, actions = loadRobotData(args.data_filename)
     dynamics_model = SVGPR(1, 1, ninducing_points = 10, minibatch_size=1000)
@@ -82,9 +90,10 @@ if __name__ == "__main__":
     print(dynamics_model.name())
 
     # Plotting the ELBO during optimzation.
-    import matplotlib.pyplot as plt
-    plt.plot(-np.array(dynamics_model.logger.logf))
-    plt.xlabel('iteration')
-    plt.ylabel('ELBO')
-    plt.show()
+    if args.plot:
+        import matplotlib.pyplot as plt
+        plt.plot(-np.array(dynamics_model.logger.logf))
+        plt.xlabel('iteration')
+        plt.ylabel('ELBO')
+        plt.show()
 

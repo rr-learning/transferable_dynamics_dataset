@@ -118,6 +118,15 @@ if __name__ == "__main__":
         dynamics_learner = PilcoDynamicsLearner(history_length,
                 prediction_horizon, ninducing, ntraining,
                 averaging=args.averaging)
+    elif args.method == 'SVGPR':
+        from DL.methods.SVGPR import SVGPR
+
+        ninducing = 1000
+        minibatch_size = 1000
+        iterations = 50000
+        dynamics_learner = SVGPR(history_length,
+                prediction_horizon, ninducing, minibatch_size,
+                iterations, averaging=args.averaging)
     elif args.method == 'linear_model_ls':
         from DL.methods.linear_regression_ls import LinearModel
 
