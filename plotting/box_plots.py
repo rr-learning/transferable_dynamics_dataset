@@ -38,6 +38,7 @@ if __name__ == "__main__":
         norms_array = from_setup_to_norms[setup]
         fig, ax = plt.subplots()
         ax.set_title(setup)
+        ax.set_yscale("log")
         ret = ax.boxplot(norms_array, labels=names)
         ax.legend(ret["boxes"], from_setup_to_RMSEs[setup], loc='upper left')
         #colors = itertools.cycle(['red','green','blue', 'purple', "yellow"])
