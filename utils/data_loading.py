@@ -126,3 +126,34 @@ def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
         inputs.append(current_input)
         targets.append(current_target)
     return np.vstack(targets), np.vstack(inputs)
+
+
+def unrollTrainingDataMinibatchesGenerator(obs_seqs, actions_seqs, history_len,
+        prediction_horizon, difference_learning):
+    """
+    Generator function that receives sequences of observations and actions and
+    returns a minibatch of training input pairs at each iteration. Notice that
+    the minibatch size is implicitly defined by the number of sequences in
+    obs_seqs and actions_seqs.
+
+    Outputs
+    -------
+
+    target: np array of size nsequences x state dim.
+
+    inputs: np array of size nsequences x input dim, where input dim is equal
+            to history_len * (action dim + state dim) +
+            (prediction_horizon - 1) * action dim.
+    """
+    assert obs_seqs.shape[:2] == actions_seqs.shape[:2]
+    nrollouts, length, nstates = obs_seqs.shape
+    for offset in range(history_len, length - prediction_horizon + 1):
+        hist_obs = obs_seqs[:, offset - history_len:offset, :]
+        hist_act = actions_seqs[:, offset - history_len:offset, :]
+        future_act = actions_seqs[:,offset: offset + prediction_horizon - 1, :]
+        output_obs = obs_seqs[:,offset + prediction_horizon - 1, :]
+        current_input = concatenateActionsStates(hist_act, hist_obs, future_act)
+        current_target = output_obs
+        if difference_learning:
+            current_target = current_target.copy() - hist_obs[:, -1, :]
+        yield (current_target, current_input)
