@@ -36,7 +36,7 @@ class Eureqa(DynamicsLearnerInterface):
 
 
     def load_normalization_stats(self):
-        std_file = "Dataset/dataset_v03_hist{}avg-h{}-standarizers.dat".format(self.history_length, self.prediction_horizon)
+        std_file = "Eureqa/dataset_v03_hist{}avg-h{}-standarizers.dat".format(self.history_length, self.prediction_horizon)
         self.inputs_standardizer, self.targets_standardizer = pickle.load(open(std_file,"rb"))
 
     def _predict(self, single_input):
