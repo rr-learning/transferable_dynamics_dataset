@@ -168,6 +168,11 @@ if __name__ == "__main__":
                           model_arch_params=params["model_arch_params"],
                           model_train_params=params["model_train_params"],
                           optional_params=params["optional_params"])
+    elif args.method == 'Eureqa':
+        from DL.methods.eureqa_dynamics_learner import Eureqa
+        dynamics_learner = Eureqa(history_length=history_length,
+                      prediction_horizon=prediction_horizon)
+
     assert dynamics_learner, "Make sure the method is implemented."
     training_observations, training_actions = loadRobotData(args.training_data)
     if args.trained_model:
