@@ -128,7 +128,7 @@ def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
     return np.vstack(targets), np.vstack(inputs)
 
 
-def unrollTrainingDataMinibatchesGenerator(obs_seqs, actions_seqs, history_len,
+def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
         prediction_horizon, difference_learning):
     """
     Generator function that receives sequences of observations and actions and

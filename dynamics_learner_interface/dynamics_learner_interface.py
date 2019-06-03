@@ -4,33 +4,53 @@ import ipdb
 import traceback
 from collections import defaultdict
 from DL.utils import unrollTrainingData, concatenateActionsStates, \
-        Standardizer, concatenateActionsStatesAverages
+        Standardizer, concatenateActionsStatesAverages, unrollTrainingDataStream
 
 
 class DynamicsLearnerInterface(object):
 
     def __init__(self, history_length, prediction_horizon,
-            difference_learning = True, averaging = False):
+            difference_learning=True, averaging=False, streaming=False):
         self.history_length = history_length
         self.prediction_horizon = prediction_horizon
         self.observation_dimension = 9
         self.action_dimension = 3
         self.difference_learning = difference_learning
         self.averaging = averaging
+        self.streaming = streaming
 
     # do not override this function!
     def learn(self, observation_sequences, action_sequences):
         self._check_learning_inputs(observation_sequences, action_sequences)
-        targets, inputs = unrollTrainingData(observation_sequences,
-                action_sequences, self.history_length, self.prediction_horizon,
-                self.difference_learning, self.averaging)
 
-        # Whitening the inputs.
         self.load_normalization_stats(observation_sequences, action_sequences)
-        standardized_targets = self.targets_standardizer.standardize(targets)
-        standardized_inputs = self.inputs_standardizer.standardize(inputs)
 
-        self._learn(standardized_inputs, standardized_targets)
+        if self.streaming:
+            training_data_stream = unrollTrainingDataStream(
+                    observation_sequences, action_sequences,
+                    self.history_length, self.prediction_horizon,
+                    self.difference_learning)
+
+            # It does not make sense to average in the streaming setting.
+            assert not self.averaging
+            normalized_data_stream = self.standardize_data_stream(
+                    training_data_stream)
+            self._learn_from_stream(normalized_data_stream)
+        else:
+            targets, inputs = unrollTrainingData(observation_sequences,
+                    action_sequences, self.history_length,
+                    self.prediction_horizon, self.difference_learning,
+                    self.averaging)
+
+            # Whitening the inputs.
+            std_targets = self.targets_standardizer.standardize(targets)
+            std_inputs = self.inputs_standardizer.standardize(inputs)
+            self._learn(std_inputs, std_targets)
+
+    def standardize_data_stream(self, data_stream):
+        for training_target, training_input in data_stream:
+            yield (self.targets_standardizer.standardize(training_target),
+                    self.inputs_standardizer.standardize(training_input))
 
     # do not override this function!
     def _preprocess_and_predict(self, observation_history, action_history, action_future=None):
@@ -105,6 +125,8 @@ class DynamicsLearnerInterface(object):
     # override this function
     def _learn(self, training_inputs, training_targets):
         """
+        Learns from the entire batch of training pairs.
+
         Parameters
         ----------
         training_inputs:        np-array of shape nTrainingInstances x input dim
@@ -113,6 +135,19 @@ class DynamicsLearnerInterface(object):
                                 the history length and prediction horizon)
         training_targets:       np-array of shape nTrainingInstances x state dim
                                 denoting the targets of the dynamics model.
+        """
+        raise NotImplementedError
+
+    # override this function
+    def _learn_from_stream(self, training_datastream):
+        """
+        Learns from a data stream which iterates over the training set. This
+        way there is no need to have the whole data set in memory.
+
+        Parameters
+        ----------
+        training_datastream: Python generator that yields (target, input) pairs
+                             of the training data set.
         """
         raise NotImplementedError
 
@@ -194,6 +229,9 @@ class DynamicsLearnerExample(DynamicsLearnerInterface):
     def _learn(self, training_inputs, training_targets):
         pass
 
+    def _learn_from_stream(self, training_data_stream):
+        pass
+
     def _predict(self, single_input):
         return np.zeros((single_input.shape[0], self.observation_dimension))
 
@@ -211,7 +249,8 @@ if __name__ == '__main__':
 
         history_length = 10
         prediction_horizon = 100
-        dynamics_learner = DynamicsLearnerExample(history_length, prediction_horizon)
+        dynamics_learner = DynamicsLearnerExample(history_length,
+                prediction_horizon, streaming=True)
         dynamics_learner.learn(observation_sequences, action_sequences)
 
         hist_obs = observation_sequences[:, :history_length].copy()
