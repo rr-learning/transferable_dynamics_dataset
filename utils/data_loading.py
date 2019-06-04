@@ -162,5 +162,5 @@ def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
                 hist_obs[np.newaxis, :, :], future_act[np.newaxis, :, :])
         current_target = output_obs
         if difference_learning:
-            current_target = current_target.copy() - hist_obs[seq_id, -1, :]
+            current_target = current_target.copy() - hist_obs[-1, :]
         yield (current_target.flatten(), current_input.flatten())

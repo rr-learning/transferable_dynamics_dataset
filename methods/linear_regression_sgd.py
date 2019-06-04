@@ -10,17 +10,28 @@ from sklearn import linear_model
 
 class LinearModelSGD(DynamicsLearnerInterface):
 
-    def __init__(self, history_length, prediction_horizon, averaging):
+    def __init__(self, history_length, prediction_horizon, difference_learning,
+            averaging, streaming):
         super().__init__(history_length, prediction_horizon,
-                averaging=averaging)
+                difference_learning, averaging=averaging, streaming=streaming)
         self.models_ = []
         for i in range(self.observation_dimension):
-            self.models_.append(linear_model.SGDRegressor(
-                verbose=0, max_iter=10000000))
+            self.models_.append(linear_model.SGDRegressor())
 
     def _learn(self, training_inputs, training_targets):
         for i in range(self.observation_dimension):
             self.models_[i].fit(training_inputs, training_targets[:,i])
+
+    def _learn_from_stream(self, training_generator):
+        count = 0
+        for training_target, training_input in training_generator:
+            if count % 1000 == 0:
+                print(count)
+            for output_idx in range(self.observation_dimension):
+                model_input = training_input.reshape(1, -1)
+                model_target = training_target[output_idx:output_idx + 1]
+                self.models_[output_idx].partial_fit(model_input, model_target)
+            count += 1
 
     def _predict(self, inputs):
         assert self.models_, "a trained model must be available"
@@ -32,13 +43,19 @@ class LinearModelSGD(DynamicsLearnerInterface):
     def name(self):
         return "linear-model-SGD"
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_filename", required=True,
             help="<Required> filename of the input robot data")
     args = parser.parse_args()
     observations, actions = loadRobotData(args.data_filename)
-    dynamics_model = LinearModelSGD(1, 1)
+
+    # Learning in batch mode.
+    dynamics_model = LinearModelSGD(1, 1, True, False, False)
+    dynamics_model.learn(observations, actions)
+    print(dynamics_model.name())
+
+    # Learning in mini batch mode.
+    dynamics_model = LinearModelSGD(1, 1, True, False, True)
     dynamics_model.learn(observations, actions)
     print(dynamics_model.name())
