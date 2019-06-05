@@ -26,10 +26,9 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
 
         self.input_dim = 3 * (prediction_horizon - 1) + history_length * 12
         self.output_dim = 9
-
+        super().__init__(history_length, prediction_horizon)
         self._parse_arch_params(**model_arch_params)
         if mode == "train":
-            super().__init__(history_length, prediction_horizon)
             self._parse_train_params(**model_train_params)
             self.model = Sequential()
             self.build()
