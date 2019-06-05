@@ -22,7 +22,8 @@ class LinearModelSGD(DynamicsLearnerInterface):
         for i in range(self.observation_dimension):
             self.models_[i].fit(training_inputs, training_targets[:,i])
 
-    def _learn_from_stream(self, training_generator):
+    def _learn_from_stream(self, training_generator, generator_size):
+        print("size of the dataset", generator_size)
         count = 0
         for training_target, training_input in training_generator:
             if count % 1000 == 0:

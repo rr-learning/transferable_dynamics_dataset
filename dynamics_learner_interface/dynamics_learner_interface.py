@@ -31,11 +31,18 @@ class DynamicsLearnerInterface(object):
                     self.history_length, self.prediction_horizon,
                     self.difference_learning)
 
+            # Computing the whole data set size from an iterator.
+            # TODO: Do this efficiently.
+            ntraining_pairs = sum(1 for _ in unrollTrainingDataStream(
+                    observation_sequences, action_sequences,
+                    self.history_length, self.prediction_horizon,
+                    self.difference_learning))
+
             # It does not make sense to average in the streaming setting.
             assert not self.averaging
             normalized_data_stream = self.standardize_data_stream(
                     training_data_stream)
-            self._learn_from_stream(normalized_data_stream)
+            self._learn_from_stream(normalized_data_stream, ntraining_pairs)
         else:
             targets, inputs = unrollTrainingData(observation_sequences,
                     action_sequences, self.history_length,
@@ -139,7 +146,7 @@ class DynamicsLearnerInterface(object):
         raise NotImplementedError
 
     # override this function
-    def _learn_from_stream(self, training_datastream):
+    def _learn_from_stream(self, training_datastream, datastream_size):
         """
         Learns from a data stream which iterates over the training set. This
         way there is no need to have the whole data set in memory.
@@ -148,6 +155,8 @@ class DynamicsLearnerInterface(object):
         ----------
         training_datastream: Python generator that yields (target, input) pairs
                              of the training data set.
+
+        datastream_size:     Number of training pairs in training_datastream.
         """
         raise NotImplementedError
 
