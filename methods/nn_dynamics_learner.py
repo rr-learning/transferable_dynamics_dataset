@@ -2,13 +2,15 @@ import os
 from time import time
 
 import numpy as np
-from keras.layers import Dense
-from keras.models import Sequential
-from keras.optimizers import Adam, Adadelta, Adagrad, SGD, RMSprop
-import keras.backend as K
-from keras.models import load_model
-from keras.callbacks import TensorBoard
-from keras import regularizers
+import tensorflow as tf
+
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam, Adadelta, Adagrad, SGD, RMSprop
+import tensorflow.keras.backend as K
+from tensorflow.keras.models import load_model
+from tensorflow.keras.callbacks import TensorBoard
+from tensorflow.keras import regularizers
 
 from DL import DynamicsLearnerInterface
 
@@ -19,6 +21,8 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
     def __init__(self,
                  history_length,
                  prediction_horizon,
+                 averaging,
+                 streaming,
                  model_arch_params,
                  model_train_params,
                  mode):
@@ -26,7 +30,9 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
 
         self.input_dim = 3 * (prediction_horizon - 1) + history_length * 12
         self.output_dim = 9
-        super().__init__(history_length, prediction_horizon)
+        super().__init__(history_length, prediction_horizon,
+                         averaging=averaging,
+                         streaming=streaming)
         self._parse_arch_params(**model_arch_params)
         if mode == "train":
             self._parse_train_params(**model_train_params)
@@ -64,6 +70,33 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
                                                                                  self.history_length,
                                                                                  self.prediction_horizon,
                                                                                  time()))
+    def _learn_from_stream(self, generator, datastream_size):
+        """
+        Parameters
+        ----------
+        training_inputs:        np-array of shape nTrainingInstances x input dim
+                                that represents the input to the dynamics
+                                (i.e. relevant observations and actions within
+                                the history length and prediction horizon)
+        training_targets:       np-array of shape nTrainingInstances x state dim
+                                denoting the targets of the dynamics model.
+        """
+
+        input_output_shapes = ([self.input_dim], [self.output_dim])
+        input_output_dtypes = (tf.float64, tf.float64)
+        def switch_input_target():
+            def gen():
+                for target, input in generator:
+                    yield input, target
+            return gen
+        ds = tf.data.Dataset.from_generator(switch_input_target(),
+                input_output_dtypes, input_output_shapes)
+        ds = ds.repeat()
+        ds = ds.batch(self.batch_size)
+        self.model.fit(ds.make_one_shot_iterator(),
+                       steps_per_epoch=datastream_size//self.batch_size,
+                       epochs=self.epochs,
+                       callbacks=[self.tensorboard])
 
     def _learn(self, training_inputs, training_targets):
         """
