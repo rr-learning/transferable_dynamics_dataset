@@ -4,7 +4,8 @@ import ipdb
 import traceback
 from collections import defaultdict
 from DL.utils import unrollTrainingData, concatenateActionsStates, \
-        Standardizer, concatenateActionsStatesAverages, unrollTrainingDataStream
+        Standardizer, concatenateActionsStatesAverages, \
+        unrollTrainingDataStream, computeNumberOfTrainingPairs
 
 
 class DynamicsLearnerInterface(object):
@@ -30,13 +31,9 @@ class DynamicsLearnerInterface(object):
                     observation_sequences, action_sequences,
                     self.history_length, self.prediction_horizon,
                     self.difference_learning)
-
-            # Computing the whole data set size from an iterator.
-            # TODO: Do this efficiently.
-            ntraining_pairs = sum(1 for _ in unrollTrainingDataStream(
-                    observation_sequences, action_sequences,
-                    self.history_length, self.prediction_horizon,
-                    self.difference_learning))
+            ntraining_pairs = computeNumberOfTrainingPairs(
+                    observation_sequences, self.history_length,
+                    self.prediction_horizon)
 
             # It does not make sense to average in the streaming setting.
             assert not self.averaging

@@ -144,9 +144,9 @@ def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
             (prediction_horizon - 1) * action dim.
     """
     assert obs_seqs.shape[:2] == actions_seqs.shape[:2]
-    nrollouts, length, _ = obs_seqs.shape
-    valid_range_len = len(range(history_len, length - prediction_horizon + 1))
-    ninstances = valid_range_len * nrollouts
+    nrollouts = obs_seqs.shape[0]
+    ninstances = computeNumberOfTrainingPairs(obs_seqs, history_len,
+            prediction_horizon)
     order = range(ninstances)
     if shuffle:
         order = np.random.permutation(ninstances)
@@ -164,3 +164,14 @@ def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
         if difference_learning:
             current_target = current_target.copy() - hist_obs[-1, :]
         yield (current_target.flatten(), current_input.flatten())
+
+def computeNumberOfTrainingPairs(obs_seqs, history_len, prediction_horizon):
+    """
+    Computes the number of training pairs (target, input) for given sequences of
+    observations and actions. Note that it also depends on the history length
+    and prediction horizon.
+    """
+    nrollouts, length, _ = obs_seqs.shape
+    valid_range_len = len(range(history_len, length - prediction_horizon + 1))
+    ninstances = valid_range_len * nrollouts
+    return ninstances

@@ -1,4 +1,5 @@
 
+from DL.utils.data_loading import computeNumberOfTrainingPairs
 from DL.utils.data_loading import unrollTrainingData
 from DL.utils.data_loading import unrollTrainingDataStream
 from DL.utils.data_loading import loadRobotData
