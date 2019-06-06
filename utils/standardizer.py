@@ -18,8 +18,19 @@ class Standardizer:
             self.updateParameters(data)
 
     def updateParameters(self, data):
-        self.means = np.mean(data, axis=0)
-        self.stds = np.std(data, axis=0)
+        n = 0
+        accum = None
+        squared = None
+        for vector in data:
+            if accum is None:
+                accum = vector.copy()
+                squared = vector * vector
+            else:
+                accum += vector
+                squared += vector * vector
+            n += 1
+        self.means = accum / n
+        self.stds = np.sqrt(squared / n - self.means * self.means)
 
     def standardize(self, dataVector):
         """

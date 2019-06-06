@@ -37,7 +37,7 @@ class DynamicsLearnerInterface(object):
 
             # It does not make sense to average in the streaming setting.
             assert not self.averaging
-            normalized_data_stream = self.standardize_data_stream(
+            normalized_data_stream = self._standardize_data_stream(
                     training_data_stream)
             self._learn_from_stream(normalized_data_stream, ntraining_pairs)
         else:
@@ -51,10 +51,18 @@ class DynamicsLearnerInterface(object):
             std_inputs = self.inputs_standardizer.standardize(inputs)
             self._learn(std_inputs, std_targets)
 
-    def standardize_data_stream(self, data_stream):
+    def _standardize_data_stream(self, data_stream):
         for training_target, training_input in data_stream:
             yield (self.targets_standardizer.standardize(training_target),
                     self.inputs_standardizer.standardize(training_input))
+
+    def _training_inputs_data_stream(self, data_stream):
+        for _, training_input in data_stream:
+            yield training_input
+
+    def _training_targets_data_stream(self, data_stream):
+        for training_target, _ in data_stream:
+            yield training_target
 
     # do not override this function!
     def _preprocess_and_predict(self, observation_history, action_history, action_future=None):
@@ -207,9 +215,22 @@ class DynamicsLearnerInterface(object):
         Loads the normalization statistics from the input data.
         """
         self._check_learning_inputs(observation_sequences, action_sequences)
-        targets, inputs = unrollTrainingData(observation_sequences,
-                action_sequences, self.history_length, self.prediction_horizon,
-                self.difference_learning, self.averaging)
+        if not self.streaming:
+            targets, inputs = unrollTrainingData(observation_sequences,
+                    action_sequences, self.history_length,
+                    self.prediction_horizon, self.difference_learning,
+                    self.averaging)
+        else:
+            targets = self._training_targets_data_stream(
+                    unrollTrainingDataStream(
+                    observation_sequences, action_sequences,
+                    self.history_length, self.prediction_horizon,
+                    self.difference_learning))
+            inputs =self. _training_inputs_data_stream(
+                    unrollTrainingDataStream(
+                    observation_sequences, action_sequences,
+                    self.history_length, self.prediction_horizon,
+                    self.difference_learning))
 
         # Loading the standardizers.
         self.targets_standardizer = Standardizer(targets)
