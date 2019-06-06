@@ -226,7 +226,7 @@ class DynamicsLearnerInterface(object):
                     observation_sequences, action_sequences,
                     self.history_length, self.prediction_horizon,
                     self.difference_learning))
-            inputs =self. _training_inputs_data_stream(
+            inputs = self._training_inputs_data_stream(
                     unrollTrainingDataStream(
                     observation_sequences, action_sequences,
                     self.history_length, self.prediction_horizon,
