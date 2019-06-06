@@ -6,6 +6,7 @@ based on the paper Gaussian Processes for Big Data (Hensman et al. 2013).
 import argparse
 import gpflow
 import numpy as np
+from collections import defaultdict
 from DL import DynamicsLearnerInterface
 from DL.utils import loadRobotData
 
@@ -28,9 +29,10 @@ class SVGPR(DynamicsLearnerInterface):
 
 
     def __init__(self, history_length, prediction_horizon,
-            ninducing_points, minibatch_size, niterations, averaging=True):
+            ninducing_points, minibatch_size, niterations, averaging=True,
+            streaming=False):
         super().__init__(history_length, prediction_horizon,
-                averaging=averaging)
+                averaging=averaging, streaming=streaming)
         self.ninducing_points = ninducing_points
         self.minibatch_size = minibatch_size
         self.niterations = niterations
@@ -77,17 +79,32 @@ class SVGPR(DynamicsLearnerInterface):
     def name(self):
         return "SVGPR"
 
+    def save(self, filename):
+        """
+        Stores the trainable hyperparameters of SVGPR including inducing points
+        """
+        params_dict = defaultdict(list)
+        params = self.model_.read_trainables()
+        for key in params.keys():
+            params_dict[key].append(params[key])
+        np.savez(filename, **params_dict)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_filename", required=True,
             help="<Required> filename of the input robot data")
     parser.add_argument("--plot", action='store_true')
+    parser.add_argument("--save", help="Filename to save the model")
     args = parser.parse_args()
     observations, actions = loadRobotData(args.data_filename)
-    dynamics_model = SVGPR(1, 1, ninducing_points = 10, minibatch_size=1000)
+    dynamics_model = SVGPR(1, 1, niterations = 10, ninducing_points = 10,
+            minibatch_size=1000)
     dynamics_model.learn(observations, actions)
     print(dynamics_model.name())
+
+    if args.save:
+        dynamics_model.save(args.save)
 
     # Plotting the ELBO during optimzation.
     if args.plot:
