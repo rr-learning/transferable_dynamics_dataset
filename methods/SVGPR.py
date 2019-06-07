@@ -44,10 +44,12 @@ class SVGPR(DynamicsLearnerInterface):
         Z = training_inputs[np.random.permutation(
                 ntraining)[:self.ninducing_points]].copy()
         assert Z.shape == (self.ninducing_points, input_dim)
+        likelihood = gpflow.likelihoods.Gaussian(np.ones(
+                self.observation_dimension))
 
         # Alternatively we can explicitly have one model per dimension.
         self.model_ = gpflow.models.SVGP(training_inputs,
-                training_targets, kern, gpflow.likelihoods.Gaussian(), Z,
+                training_targets, kern, likelihood, Z,
                 minibatch_size=self.minibatch_size)
         print('Initial loglikelihood: ', self.model_.compute_log_likelihood())
         self.logger_ = self.run_adam_()
@@ -83,11 +85,8 @@ class SVGPR(DynamicsLearnerInterface):
         """
         Stores the trainable hyperparameters of SVGPR including inducing points
         """
-        params_dict = defaultdict(list)
         params = self.model_.read_trainables()
-        for key in params.keys():
-            params_dict[key].append(params[key])
-        np.savez(filename, **params_dict)
+        np.savez(filename, **params)
 
 
 if __name__ == "__main__":
