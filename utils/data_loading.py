@@ -129,11 +129,12 @@ def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
 
 
 def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
-        prediction_horizon, difference_learning, shuffle=True):
+        prediction_horizon, difference_learning, shuffle=True, infinite=True):
     """
     Generator function that receives sequences of observations and actions and
     yields training pairs (target, input). Notice that the order of the pairs
-    can be shuffled.
+    is shuffled by default. Moreover, the data iteration restarts from the
+    beginning once the training pairs are exhausted if infinite=True (default).
 
     Outputs
     -------
@@ -150,26 +151,29 @@ def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
     order = range(ninstances)
     if shuffle:
         order = np.random.permutation(ninstances)
-    for index in order:
-        seq_id = index % nrollouts
-        offset = index // nrollouts + history_len
-        hist_obs = obs_seqs[seq_id, offset - history_len:offset, :]
-        hist_act = actions_seqs[seq_id, offset - history_len:offset, :]
-        future_act = actions_seqs[seq_id,
-                offset: offset + prediction_horizon - 1, :]
-        output_obs = obs_seqs[seq_id, offset + prediction_horizon - 1, :]
-        current_input = concatenateActionsStates(hist_act[np.newaxis, :, :],
-                hist_obs[np.newaxis, :, :], future_act[np.newaxis, :, :])
-        current_target = output_obs
-        if difference_learning:
-            current_target = current_target.copy() - hist_obs[-1, :]
-        yield (current_target.flatten(), current_input.flatten())
+    while True:
+        for index in order:
+            seq_id = index % nrollouts
+            offset = index // nrollouts + history_len
+            hist_obs = obs_seqs[seq_id, offset - history_len:offset, :]
+            hist_act = actions_seqs[seq_id, offset - history_len:offset, :]
+            future_act = actions_seqs[seq_id,
+                    offset: offset + prediction_horizon - 1, :]
+            output_obs = obs_seqs[seq_id, offset + prediction_horizon - 1, :]
+            current_input = concatenateActionsStates(hist_act[np.newaxis, :, :],
+                    hist_obs[np.newaxis, :, :], future_act[np.newaxis, :, :])
+            current_target = output_obs
+            if difference_learning:
+                current_target = current_target.copy() - hist_obs[-1, :]
+            yield (current_target.flatten(), current_input.flatten())
+        if not infinite:
+            break
 
 def computeNumberOfTrainingPairs(obs_seqs, history_len, prediction_horizon):
     """
-    Computes the number of training pairs (target, input) for given sequences of
-    observations and actions. Note that it also depends on the history length
-    and prediction horizon.
+    Computes the number of different training pairs (target, input) for given
+    sequences of observations and actions. Note that it also depends on the
+    history length and prediction horizon.
     """
     nrollouts, length, _ = obs_seqs.shape
     valid_range_len = len(range(history_len, length - prediction_horizon + 1))
