@@ -88,6 +88,14 @@ class SVGPR(DynamicsLearnerInterface):
         params = self.model_.read_trainables()
         np.savez(filename, **params)
 
+    def compute_log_likelihood(self, niter):
+        """
+        Computes the ELBO stochastiscally using minibatches.
+        """
+        evals = [self.model_.compute_log_likelihood() for _ in range(niter)]
+        return evals
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
@@ -97,11 +105,11 @@ if __name__ == "__main__":
     parser.add_argument("--save", help="Filename to save the model")
     args = parser.parse_args()
     observations, actions = loadRobotData(args.data_filename)
-    dynamics_model = SVGPR(1, 1, niterations = 10, ninducing_points = 10,
-            minibatch_size=1000)
+    dynamics_model = SVGPR(1, 1, niterations = 1000, ninducing_points = 10,
+            minibatch_size=10)
     dynamics_model.learn(observations, actions)
-    print(dynamics_model.name())
-
+    elbo_evals = dynamics_model.compute_log_likelihood(100)
+    print("Mean ELBO value over training set: ", np.mean(elbo_evals))
     if args.save:
         dynamics_model.save(args.save)
 
