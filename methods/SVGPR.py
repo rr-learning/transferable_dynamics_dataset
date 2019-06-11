@@ -19,7 +19,7 @@ class SVGPR(DynamicsLearnerInterface):
             self.logf = []
 
         def run(self, ctx):
-            if (ctx.iteration % 100) == 0:
+            if (ctx.iteration % 10) == 0:
                 # Extract likelihood tensor from Tensorflow session
                 likelihood = - ctx.session.run(self.model.likelihood_tensor)
                 # Append likelihood value to list
@@ -29,13 +29,13 @@ class SVGPR(DynamicsLearnerInterface):
 
 
     def __init__(self, history_length, prediction_horizon,
-            ninducing_points, minibatch_size, niterations, averaging=True,
+            ninducing_points, minibatch_size, epochs, averaging=True,
             streaming=False):
         super().__init__(history_length, prediction_horizon,
                 averaging=averaging, streaming=streaming)
         self.ninducing_points = ninducing_points
         self.minibatch_size = minibatch_size
-        self.niterations = niterations
+        self.epochs = epochs
 
     def _learn(self, training_inputs, training_targets):
         ntraining, input_dim  = training_inputs.shape
@@ -52,7 +52,9 @@ class SVGPR(DynamicsLearnerInterface):
                 training_targets, kern, likelihood, Z,
                 minibatch_size=self.minibatch_size)
         print('Initial loglikelihood: ', self.model_.compute_log_likelihood())
-        self.logger_ = self.run_adam_()
+        iterations_for_single_epoch = ntraining // self.minibatch_size + 1
+        print("Total number of iterations:", iterations_for_single_epoch)
+        self.logger_ = self.run_adam_(iterations_for_single_epoch*self.epochs)
         print('Trained loglikelihood: ', self.model_.compute_log_likelihood())
 
     def _predict(self, inputs):
@@ -60,7 +62,7 @@ class SVGPR(DynamicsLearnerInterface):
         mean, _ = self.model_.predict_f(inputs)
         return mean
 
-    def run_adam_(self):
+    def run_adam_(self, niterations):
         """
         Utility function running the Adam Optimiser interleaved with a `Logger` action.
 
@@ -73,7 +75,7 @@ class SVGPR(DynamicsLearnerInterface):
         self.logger = self.Logger(self.model_)
         actions = [adam, self.logger]
         # Create optimisation loop that interleaves Adam with Logger
-        loop = gpflow.actions.Loop(actions, stop=self.niterations)()
+        loop = gpflow.actions.Loop(actions, stop=niterations)()
         # Bind current TF session to model
         self.model_.anchor(self.model_.enquire_session())
         return self.logger
@@ -105,8 +107,8 @@ if __name__ == "__main__":
     parser.add_argument("--save", help="Filename to save the model")
     args = parser.parse_args()
     observations, actions = loadRobotData(args.data_filename)
-    dynamics_model = SVGPR(1, 1, niterations = 1000, ninducing_points = 10,
-            minibatch_size=10)
+    dynamics_model = SVGPR(1, 1, epochs = 2, ninducing_points = 10,
+            minibatch_size=1000)
     dynamics_model.learn(observations, actions)
     elbo_evals = dynamics_model.compute_log_likelihood(100)
     print("Mean ELBO value over training set: ", np.mean(elbo_evals))
