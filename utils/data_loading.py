@@ -129,7 +129,7 @@ def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
 
 
 def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
-        prediction_horizon, difference_learning, shuffle=True, infinite=True):
+        prediction_horizon, difference_learning, shuffle=True, infinite=False):
     """
     Generator function that receives sequences of observations and actions and
     yields training pairs (target, input). Notice that the order of the pairs
