@@ -130,10 +130,10 @@ if __name__ == "__main__":
 
         ninducing = 1000
         minibatch_size = 1000
-        epochs = 5
+        epochs = 10
         dynamics_learner = SVGPR(history_length,
                 prediction_horizon, ninducing, minibatch_size,
-                epochs = 5, averaging=args.averaging, streaming=args.streaming)
+                epochs=epochs, averaging=args.averaging, streaming=args.streaming)
     elif args.method == 'linear_model_ls':
         from DL.methods.linear_regression_ls import LinearModel
 
