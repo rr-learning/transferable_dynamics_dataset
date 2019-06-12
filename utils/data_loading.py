@@ -149,9 +149,9 @@ def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
     ninstances = computeNumberOfTrainingPairs(obs_seqs, history_len,
             prediction_horizon)
     order = range(ninstances)
-    if shuffle:
-        order = np.random.permutation(ninstances)
     while True:
+        if shuffle:
+            order = np.random.permutation(ninstances)
         for index in order:
             seq_id = index % nrollouts
             offset = index // nrollouts + history_len

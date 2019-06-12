@@ -35,8 +35,6 @@ class DynamicsLearnerInterface(object):
                     observation_sequences, self.history_length,
                     self.prediction_horizon)
 
-            # It does not make sense to average in the streaming setting.
-            assert not self.averaging
             normalized_data_stream = self._standardize_data_stream(
                     training_data_stream)
             self._learn_from_stream(normalized_data_stream, ntraining_pairs)
