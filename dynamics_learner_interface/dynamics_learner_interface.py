@@ -223,13 +223,13 @@ class DynamicsLearnerInterface(object):
                     unrollTrainingDataStream(
                     observation_sequences, action_sequences,
                     self.history_length, self.prediction_horizon,
-                    self.difference_learning, average=self.average,
+                    self.difference_learning, average=self.averaging,
                     infinite=False))
             inputs = self._training_inputs_data_stream(
                     unrollTrainingDataStream(
                     observation_sequences, action_sequences,
                     self.history_length, self.prediction_horizon,
-                    self.difference_learning, average=self.average,
+                    self.difference_learning, average=self.averaging,
                     infinite=False))
 
         # Loading the standardizers.
