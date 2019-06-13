@@ -11,7 +11,7 @@ from collections import defaultdict
 from DL.evaluation.evaluation import get_angle_errors, compute_RMSE_from_errors
 
 def plot_errors(error_files, names=None):
-    if args.names:
+    if names:
         assert len(names) == len(error_files)
     from_setup_to_norms = defaultdict(list)
     from_setup_to_RMSEs = defaultdict(list)
