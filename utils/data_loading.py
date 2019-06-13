@@ -129,7 +129,8 @@ def unrollTrainingData(obs_seqs, actions_seqs, history_len, prediction_horizon,
 
 
 def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
-        prediction_horizon, difference_learning, shuffle=True, infinite=False):
+        prediction_horizon, difference_learning, average=False, shuffle=True,
+        infinite=False):
     """
     Generator function that receives sequences of observations and actions and
     yields training pairs (target, input). Notice that the order of the pairs
@@ -160,8 +161,14 @@ def unrollTrainingDataStream(obs_seqs, actions_seqs, history_len,
             future_act = actions_seqs[seq_id,
                     offset: offset + prediction_horizon - 1, :]
             output_obs = obs_seqs[seq_id, offset + prediction_horizon - 1, :]
-            current_input = concatenateActionsStates(hist_act[np.newaxis, :, :],
-                    hist_obs[np.newaxis, :, :], future_act[np.newaxis, :, :])
+            if average:
+                current_input = concatenateActionsStatesAverages(
+                        hist_act[np.newaxis, :, :], hist_obs[np.newaxis, :, :],
+                        future_act[np.newaxis, :, :])
+            else:
+                current_input = concatenateActionsStates(
+                        hist_act[np.newaxis, :, :], hist_obs[np.newaxis, :, :],
+                        future_act[np.newaxis, :, :])
             current_target = output_obs
             if difference_learning:
                 current_target = current_target.copy() - hist_obs[-1, :]
