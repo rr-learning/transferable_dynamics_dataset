@@ -256,7 +256,7 @@ class DynamicsLearnerExample(DynamicsLearnerInterface):
     def _learn(self, training_inputs, training_targets):
         pass
 
-    def _learn_from_stream(self, training_data_stream):
+    def _learn_from_stream(self, training_data_stream, datastream_size):
         pass
 
     def _predict(self, single_input):
