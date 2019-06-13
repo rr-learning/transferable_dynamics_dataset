@@ -1,7 +1,5 @@
 import numpy as np
 import sys
-import ipdb
-import traceback
 from collections import defaultdict
 from DL.utils import unrollTrainingData, concatenateActionsStates, \
         Standardizer, concatenateActionsStatesAverages, \
@@ -275,43 +273,31 @@ class DynamicsLearnerExample(DynamicsLearnerInterface):
 
 
 if __name__ == '__main__':
-    try:
+    data = np.load('./Dataset/dataset_v01.npz')
+    observation_sequences = np.concatenate((data['measured_angles'],
+                                            data['measured_velocities'],
+                                            data['measured_torques']), 2)
+    action_sequences = data['constrained_torques']
+    history_length = 10
+    prediction_horizon = 100
+    dynamics_learner = DynamicsLearnerExample(history_length,
+            prediction_horizon, streaming=True)
+    dynamics_learner.learn(observation_sequences, action_sequences)
 
-        data = np.load('./Dataset/dataset_v01.npz')
+    hist_obs = observation_sequences[:, :history_length].copy()
+    hist_act = action_sequences[:, :history_length].copy()
+    fut_act = action_sequences[:, history_length:history_length +
+            prediction_horizon - 1].copy()
+    observation_prediction = dynamics_learner.predict(hist_obs, hist_act,
+            fut_act)
+    rms = np.linalg.norm(observation_sequences[:, history_length + prediction_horizon - 1] -
+                         observation_prediction)
 
-        observation_sequences = np.concatenate((data['measured_angles'],
-                                                data['measured_velocities'],
-                                                data['measured_torques']), 2)
-
-        action_sequences = data['constrained_torques']
-
-        history_length = 10
-        prediction_horizon = 100
-        dynamics_learner = DynamicsLearnerExample(history_length,
-                prediction_horizon, streaming=True)
-        dynamics_learner.learn(observation_sequences, action_sequences)
-
-        hist_obs = observation_sequences[:, :history_length].copy()
-        hist_act = action_sequences[:, :history_length].copy()
-        fut_act = action_sequences[:, history_length:history_length +
-                prediction_horizon - 1].copy()
-        observation_prediction = dynamics_learner.predict(hist_obs, hist_act,
-                fut_act)
-        rms = np.linalg.norm(observation_sequences[:, history_length + prediction_horizon - 1] -
-                             observation_prediction)
-
-        # Asserting that the inputs to the predict method were left unchanged.
-        assert np.array_equal(hist_obs,
-                observation_sequences[:, :history_length])
-        assert np.array_equal(hist_act,
-                action_sequences[:, :history_length])
-        assert np.array_equal(fut_act, action_sequences[:,
-                history_length:history_length + prediction_horizon - 1])
-        print('rms: ', rms)
-
-        ipdb.set_trace()
-
-    except:
-        traceback.print_exc(sys.stdout)
-        _, _, tb = sys.exc_info()
-        ipdb.post_mortem(tb)
+    # Asserting that the inputs to the predict method were left unchanged.
+    assert np.array_equal(hist_obs,
+            observation_sequences[:, :history_length])
+    assert np.array_equal(hist_act,
+            action_sequences[:, :history_length])
+    assert np.array_equal(fut_act, action_sequences[:,
+            history_length:history_length + prediction_horizon - 1])
+    print('rms: ', rms)
