@@ -23,17 +23,13 @@ class LinearModelSGD(DynamicsLearnerInterface):
             self.models_[i].fit(training_inputs, training_targets[:,i])
 
     def _learn_from_stream(self, training_generator, generator_size):
-        print("size of the dataset", generator_size)
-        count = 0
-        for training_target, training_input in training_generator:
-            if count % 1000 == 0:
-                print(count)
+        for count in range(generator_size):
+            training_target, training_input = next(training_generator)
             assert training_input.shape[0] == self._get_input_dim()
             model_input = training_input.reshape(1, -1)
             for output_idx in range(self.observation_dimension):
                 model_target = training_target[output_idx:output_idx + 1]
                 self.models_[output_idx].partial_fit(model_input, model_target)
-            count += 1
 
     def _predict(self, inputs):
         assert self.models_, "a trained model must be available"
