@@ -10,20 +10,12 @@ import numpy as np
 from collections import defaultdict
 from DL.evaluation.evaluation import get_angle_errors, compute_RMSE_from_errors
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--error_files", required=True, nargs='+',
-            help="Filename of the error files to plot")
-    parser.add_argument("--names", nargs='+', help="Names of the methods to"
-            " display")
-    args = parser.parse_args()
-    names = args.error_files
+def plot_errors(error_files, names=None):
     if args.names:
-        assert len(args.names) == len(args.error_files)
-        names = args.names
+        assert len(names) == len(error_files)
     from_setup_to_norms = defaultdict(list)
     from_setup_to_RMSEs = defaultdict(list)
-    for error in args.error_files:
+    for error in error_files:
         errors_dict = np.load(error)
         for setup, errors in errors_dict.items():
             np_errors = get_angle_errors(errors)
@@ -46,3 +38,12 @@ if __name__ == "__main__":
         #    box.set_facecolor(next(colors))
         plt.show()
 
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--error_files", required=True, nargs='+',
+            help="Filename of the error files to plot")
+    parser.add_argument("--names", nargs='+', help="Names of the methods to"
+            " display")
+    args = parser.parse_args()
+    plot_errors(args.error_files, args.names)
