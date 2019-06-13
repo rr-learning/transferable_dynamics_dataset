@@ -28,8 +28,9 @@ class LinearModelSGD(DynamicsLearnerInterface):
         for training_target, training_input in training_generator:
             if count % 1000 == 0:
                 print(count)
+            assert training_input.shape[0] == self._get_input_dim()
+            model_input = training_input.reshape(1, -1)
             for output_idx in range(self.observation_dimension):
-                model_input = training_input.reshape(1, -1)
                 model_target = training_target[output_idx:output_idx + 1]
                 self.models_[output_idx].partial_fit(model_input, model_target)
             count += 1

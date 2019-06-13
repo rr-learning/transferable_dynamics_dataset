@@ -38,12 +38,6 @@ class SVGPR(DynamicsLearnerInterface):
         self.minibatch_size = minibatch_size
         self.epochs = epochs
 
-    #TODO: It makes sense to move this to the interface.
-    def _get_input_dim(self):
-        return self.history_length * (self.observation_dimension +
-                self.action_dimension ) + (self.prediction_horizon
-                - 1) * self.action_dimension
-
     def _learn(self, training_inputs, training_targets):
         ntraining, input_dim  = training_inputs.shape
         assert input_dim == self._get_input_dim()

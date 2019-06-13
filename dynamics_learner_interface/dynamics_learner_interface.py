@@ -128,6 +128,17 @@ class DynamicsLearnerInterface(object):
 
         return predicted_observation
 
+    # Do not override this function.
+    def _get_input_dim(self):
+        if self.averaging:
+            ret = self.observation_dimension + self.action_dimension
+            if self.prediction_horizon > 1:
+                ret += self.action_dimension
+            return ret
+        return self.history_length * (self.observation_dimension +
+                self.action_dimension ) + (self.prediction_horizon
+                - 1) * self.action_dimension
+
     # override this function
     def name(self):
         raise NotImplementedError
