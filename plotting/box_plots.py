@@ -4,6 +4,7 @@ Box plotting of multiple error files.
 
 import argparse
 import itertools
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -26,17 +27,23 @@ def plot_errors(error_files, names=None):
             from_setup_to_norms[setup].append(norms)
             from_setup_to_RMSEs[setup].append(compute_RMSE_from_errors(
                 np_errors))
-    for setup in from_setup_to_norms.keys():
+    plt.figure(figsize=(16,4))
+    for i, setup in enumerate(from_setup_to_norms.keys()):
         norms_array = from_setup_to_norms[setup]
-        fig, ax = plt.subplots()
+        ax = plt.subplot(1, len(from_setup_to_norms.keys()), i + 1)
         ax.set_title(setup)
         ax.set_yscale("log")
-        ret = ax.boxplot(norms_array, labels=names)
-        ax.legend(ret["boxes"], from_setup_to_RMSEs[setup], loc='upper left')
-        #colors = itertools.cycle(['red','green','blue', 'purple', "yellow"])
-        #for box in ret["boxes"]:
-        #    box.set_facecolor(next(colors))
-        plt.show()
+        ret = ax.boxplot(norms_array)
+        if names:
+            xtickNames = plt.setp(ax, xticklabels=names)
+            plt.setp(xtickNames, rotation=45, fontsize=8)
+        red_patch = mpatches.Patch(color='black')
+        patches = [red_patch] * len(error_files)
+        entries = from_setup_to_RMSEs[setup]
+        if names:
+            entries = ["{}={:.8f}".format(x,y) for x,y in zip(names, entries)]
+        ax.legend(patches, entries, loc='lower left', bbox_to_anchor= (0.0, 1.1))
+    plt.show()
 
 
 if __name__ == "__main__":
