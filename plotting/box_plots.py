@@ -11,7 +11,8 @@ import numpy as np
 from collections import defaultdict
 from DL.evaluation.evaluation import get_angle_errors, compute_RMSE_from_errors
 
-def plot_errors(error_files, names=None):
+
+def plot_errors(error_files, names=None, violinplot=False):
     if names:
         assert len(names) == len(error_files)
     from_setup_to_norms = defaultdict(list)
@@ -33,10 +34,14 @@ def plot_errors(error_files, names=None):
         ax = plt.subplot(1, len(from_setup_to_norms.keys()), i + 1)
         ax.set_title(setup)
         ax.set_yscale("log")
-        ret = ax.boxplot(norms_array)
+        if violinplot:
+            ret = ax.violinplot(norms_array, showmeans=True, showmedians=True,
+                    showextrema=True)
+        else:
+            ret = ax.boxplot(norms_array, showmeans=True)
         if names:
-            xtickNames = plt.setp(ax, xticklabels=names)
-            plt.setp(xtickNames, rotation=45, fontsize=8)
+            ax.set_xticks([y+1 for y in range(len(error_files))])
+            ax.set_xticklabels(names, rotation=45, fontsize=8)
         red_patch = mpatches.Patch(color='black')
         patches = [red_patch] * len(error_files)
         entries = from_setup_to_RMSEs[setup]
@@ -52,5 +57,6 @@ if __name__ == "__main__":
             help="Filename of the error files to plot")
     parser.add_argument("--names", nargs='+', help="Names of the methods to"
             " display")
+    parser.add_argument("--violinplot", action='store_true')
     args = parser.parse_args()
-    plot_errors(args.error_files, args.names)
+    plot_errors(args.error_files, args.names, args.violinplot)
