@@ -193,7 +193,11 @@ if __name__ == "__main__":
                 training_actions)
         dynamics_learner.load(args.trained_model)
     else:
+        initial_time = time.perf_counter()
         dynamics_learner.learn(training_observations, training_actions)
+        if args.verbose:
+            print('Training time {} s'.format(
+                time.perf_counter() - initial_time))
         if args.output_model:
             dynamics_learner.save(args.output_model)
 
