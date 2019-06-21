@@ -3,7 +3,6 @@ Evaluation functionality. Note that it can also be called as a script.
 """
 import os
 import json
-import ipdb
 import argparse
 import numpy as np
 import time
@@ -31,21 +30,24 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
         errors = np.empty((observation_sequences.shape[0],
                            len(T),
                            observation_sequences.shape[2]))
+        times = []
         for i in range(len(T)):
-            start_time = time.perf_counter()
             t = T[i]
             observation_history = observation_sequences[:, t + 1 - history_length: t + 1]
             action_history = action_sequences[:, t + 1 - history_length: t + 1]
             action_future = action_sequences[:, t + 1: t + prediction_horizon]
+            start_time = time.perf_counter()
             observation_prediction = dynamics_learner.predict(
                     observation_history=observation_history,
                     action_history=action_history,
                     action_future=action_future)
+            times.append(time.perf_counter() - start_time)
             true_observation = observation_sequences[:, t + prediction_horizon]
             errors[:, i] = true_observation - observation_prediction
-            if verbose:
-                print('Elapsed time for each predict call {}'.format(
-                    time.perf_counter() - start_time))
+        if verbose:
+            times = np.array(times)
+            print('Elapsed time for dataset {}: {} +- {}'.format(
+                    test_dataset_name, np.mean(times), np.std(times)))
 
         errors_key = test_dataset_name + '__history_' + str(history_length) + \
                 '__training_horizon_' + \
