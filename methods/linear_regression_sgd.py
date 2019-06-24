@@ -16,7 +16,8 @@ class LinearModelSGD(DynamicsLearnerInterface):
                 difference_learning, averaging=averaging, streaming=streaming)
         self.models_ = []
         for i in range(self.observation_dimension):
-            self.models_.append(linear_model.SGDRegressor())
+            self.models_.append(linear_model.SGDRegressor(verbose=False,
+                learning_rate='constant', eta0=0.00001))
 
     def _learn(self, training_inputs, training_targets):
         for i in range(self.observation_dimension):
