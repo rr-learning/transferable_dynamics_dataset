@@ -187,7 +187,7 @@ if __name__ == "__main__":
                       averaging=args.averaging,
                       streaming=args.streaming)
     elif args.method == 'lwpr':
-        from DL.methods.lwpr import lwpr_dyn_model
+        from DL.methods.LWPR import lwpr_dyn_model
         settings = None
         if args.settings:
             with open(settings_file, 'r') as f:
