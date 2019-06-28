@@ -11,7 +11,7 @@ from lwpr import LWPR
 class lwpr_dyn_model(DynamicsLearnerInterface):
 
     def __init__(self, history_length, prediction_horizon, difference_learning,
-            averaging, streaming):
+            averaging, streaming, settings=None):
         super().__init__(history_length, prediction_horizon,
                 difference_learning, averaging=averaging, streaming=streaming)
         self.model_ = LWPR(self._get_input_dim(), self.observation_dimension)
@@ -22,7 +22,8 @@ class lwpr_dyn_model(DynamicsLearnerInterface):
 
         def gen(inputs, targets):
             for i in range(inputs.shape[0]):
-                if i % 100 == 0:
+                if i % 1000 == 0:
+                    print(i)
                 yield targets[i], inputs[i]
 
         self._learn_from_stream(gen(training_inputs, training_targets),
@@ -39,7 +40,9 @@ class lwpr_dyn_model(DynamicsLearnerInterface):
     def _predict(self, inputs):
         assert self.model_, "a trained model must be available"
         prediction = np.zeros((inputs.shape[0], self.observation_dimension))
-        raise NotImplementedError
+        for idx in range(inputs.shape[0]):
+            prediction[idx, :] = self.model_.predict(inputs[idx])
+        return prediction
 
     def name(self):
         return "LWPR"

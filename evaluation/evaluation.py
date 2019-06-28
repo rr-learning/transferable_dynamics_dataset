@@ -186,6 +186,15 @@ if __name__ == "__main__":
                       prediction_horizon=prediction_horizon,
                       averaging=args.averaging,
                       streaming=args.streaming)
+    elif args.method == 'lwpr':
+        from DL.methods.lwpr import lwpr_dyn_model
+        settings = None
+        if args.settings:
+            with open(settings_file, 'r') as f:
+                settings = json.load(f)
+        dynamics_learner = lwpr_dyn_model(history_length, prediction_horizon,
+                difference_learning=True, averaging=args.averaging,
+                streaming=args.streaming, settings=settings)
     assert dynamics_learner, "Make sure the method is implemented."
     training_observations, training_actions = loadRobotData(args.training_data)
     if args.trained_model:
@@ -201,22 +210,24 @@ if __name__ == "__main__":
         if args.output_model:
             dynamics_learner.save(args.output_model)
 
-    datasets = []
+    datasets = {}
     if args.transfer_test_data:
-        datasets = args.transfer_test_data
+        for i, dataset_path in enumerate(args.transfer_test_data):
+            datasets['transfer_test_data_{}'.format(i + 1)] = dataset_path
     for dataset in ['training_data', 'iid_test_data', 'validation_data']:
         dataset_path = getattr(args, dataset)
         if dataset_path:
-            datasets.append(dataset_path)
+            datasets[dataset] = dataset_path
 
     # Maps each data set to its corresponding error file.
     set_to_errors = {}
-    for dataset_path in datasets:
+    for dataset in sorted(datasets.keys()):
+        dataset_path = datasets[dataset]
         testing_observations, testing_actions = loadRobotData(dataset_path)
         errors = evaluate(dynamics_learner, testing_observations,
-                testing_actions, dataset_path, verbose=args.verbose)
-        set_to_errors[dataset_path] = errors
-        print("{} error:".format(dataset_path))
+                testing_actions, dataset, verbose=args.verbose)
+        set_to_errors[dataset] = errors
+        print("{} error:".format(dataset))
         angle_errors = get_angle_errors(errors)
         print(compute_RMSE_from_errors(angle_errors))
     np.savez(args.output_errors, **set_to_errors)
