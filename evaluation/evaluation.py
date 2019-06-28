@@ -190,7 +190,7 @@ if __name__ == "__main__":
         from DL.methods.LWPR import lwpr_dyn_model
         settings = None
         if args.settings:
-            with open(settings_file, 'r') as f:
+            with open(args.settings, 'r') as f:
                 settings = json.load(f)
         dynamics_learner = lwpr_dyn_model(history_length, prediction_horizon,
                 difference_learning=True, averaging=args.averaging,

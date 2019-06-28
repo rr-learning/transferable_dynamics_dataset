@@ -15,13 +15,15 @@ class lwpr_dyn_model(DynamicsLearnerInterface):
         super().__init__(history_length, prediction_horizon,
                 difference_learning, averaging=averaging, streaming=streaming)
         self.model_ = LWPR(self._get_input_dim(), self.observation_dimension)
-        self.model_.init_D = 20 * np.eye(self._get_input_dim())
-        self.model_.init_alpha = 100 * np.eye(self._get_input_dim())
+
+        # Default values.
+        init_D = 20
+        init_alpha = 100
         if settings:
-            self.model_.init_D = settings.init_D * np.eye(
-                    self._get_input_dim())
-            self.model_.init_alpha = settings.init_alpha * np.eye(
-                    self._get_input_dim())
+            init_D = settings['init_D']
+            init_alpha = settings['init_alpha']
+        self.model_.init_D = init_D * np.eye(self._get_input_dim())
+        self.model_.init_alpha = init_alpha * np.eye(self._get_input_dim())
 
     def _learn(self, training_inputs, training_targets):
 
