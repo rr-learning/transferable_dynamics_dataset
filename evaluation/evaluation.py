@@ -93,7 +93,7 @@ if __name__ == "__main__":
             help="filename of the input robot validation data")
     parser.add_argument("--iid_test_data",
             help="filename of the input robot iid testing data")
-    parser.add_argument("--transfer_test_data",
+    parser.add_argument("--transfer_test_data", nargs='+',
             help="filename of the input robot transfer testing data")
     parser.add_argument("--method", required=True,
             help="<Required> Name of the method that will be tested")
@@ -201,19 +201,22 @@ if __name__ == "__main__":
         if args.output_model:
             dynamics_learner.save(args.output_model)
 
-    datasets = ['training_data', 'iid_test_data', 'transfer_test_data',
-            'validation_data']
+    datasets = []
+    if args.transfer_test_data:
+        datasets = args.transfer_test_data
+    for dataset in ['training_data', 'iid_test_data', 'validation_data']:
+        dataset_path = getattr(args, dataset)
+        if dataset_path:
+            datasets.append(dataset_path)
 
     # Maps each data set to its corresponding error file.
     set_to_errors = {}
-    for dataset in datasets:
-        dataset_path = getattr(args, dataset)
-        if dataset_path:
-            testing_observations, testing_actions = loadRobotData(dataset_path)
-            errors = evaluate(dynamics_learner, testing_observations,
-                    testing_actions, dataset, verbose=args.verbose)
-            set_to_errors[dataset] = errors
-            print("{} error:".format(dataset))
-            angle_errors = get_angle_errors(errors)
-            print(compute_RMSE_from_errors(angle_errors))
+    for dataset_path in datasets:
+        testing_observations, testing_actions = loadRobotData(dataset_path)
+        errors = evaluate(dynamics_learner, testing_observations,
+                testing_actions, dataset_path, verbose=args.verbose)
+        set_to_errors[dataset_path] = errors
+        print("{} error:".format(dataset_path))
+        angle_errors = get_angle_errors(errors)
+        print(compute_RMSE_from_errors(angle_errors))
     np.savez(args.output_errors, **set_to_errors)
