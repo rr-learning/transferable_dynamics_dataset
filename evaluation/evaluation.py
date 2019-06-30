@@ -99,7 +99,7 @@ if __name__ == "__main__":
             help="<Required> Name of the method that will be tested")
     parser.add_argument("--history_length", type=int, default=1)
     parser.add_argument("--prediction_horizon", type=int, default=1)
-    parser.add_argument("--output_errors", required=True,
+    parser.add_argument("--output_errors",
             help="<Required> filename where the computed errors will be saved")
     parser.add_argument("--output_model",
             help="filename where the trained model will be saved if a trained"
@@ -114,6 +114,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     history_length = args.history_length
     prediction_horizon = args.prediction_horizon
+    settings = None
+    if args.settings:
+        with open(args.settings, 'r') as f:
+            settings = json.load(f)
     dynamics_learner = None
     if args.method == 'example':
         dynamics_learner = DynamicsLearnerExample(history_length,
@@ -146,7 +150,7 @@ if __name__ == "__main__":
 
         dynamics_learner = LinearModelSGD(history_length, prediction_horizon,
             difference_learning=True, averaging=args.averaging,
-            streaming=args.streaming)
+            streaming=args.streaming, settings=settings)
     elif args.method == 'BNN':
         from DL.methods.BNN import BNNLearner
 
@@ -188,10 +192,6 @@ if __name__ == "__main__":
                       streaming=args.streaming)
     elif args.method == 'lwpr':
         from DL.methods.LWPR import lwpr_dyn_model
-        settings = None
-        if args.settings:
-            with open(args.settings, 'r') as f:
-                settings = json.load(f)
         dynamics_learner = lwpr_dyn_model(history_length, prediction_horizon,
                 difference_learning=True, averaging=args.averaging,
                 streaming=args.streaming, settings=settings)
@@ -230,4 +230,5 @@ if __name__ == "__main__":
         print("{} error:".format(dataset))
         angle_errors = get_angle_errors(errors)
         print(compute_RMSE_from_errors(angle_errors))
-    np.savez(args.output_errors, **set_to_errors)
+    if args.output_errors:
+        np.savez(args.output_errors, **set_to_errors)

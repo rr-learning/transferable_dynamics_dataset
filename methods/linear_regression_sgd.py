@@ -11,13 +11,16 @@ from sklearn import linear_model
 class LinearModelSGD(DynamicsLearnerInterface):
 
     def __init__(self, history_length, prediction_horizon, difference_learning,
-            averaging, streaming):
+            averaging, streaming, settings=None):
         super().__init__(history_length, prediction_horizon,
                 difference_learning, averaging=averaging, streaming=streaming)
+        eta0 = 0.00001
+        if settings:
+            eta0 = settings['eta0']
         self.models_ = []
         for i in range(self.observation_dimension):
             self.models_.append(linear_model.SGDRegressor(verbose=False,
-                learning_rate='constant', eta0=0.00001))
+                learning_rate='constant', eta0=eta0))
 
     def _learn(self, training_inputs, training_targets):
         for i in range(self.observation_dimension):
