@@ -11,7 +11,7 @@ from sklearn import linear_model
 class LinearModelSGD(DynamicsLearnerInterface):
 
     def __init__(self, history_length, prediction_horizon, difference_learning,
-            averaging, streaming, settings=None):
+            averaging, streaming, epochs=1, settings=None):
         super().__init__(history_length, prediction_horizon,
                 difference_learning, averaging=averaging, streaming=streaming)
         eta0 = 0.00001
@@ -21,13 +21,14 @@ class LinearModelSGD(DynamicsLearnerInterface):
         for i in range(self.observation_dimension):
             self.models_.append(linear_model.SGDRegressor(verbose=False,
                 learning_rate='constant', eta0=eta0))
+        self.epochs_ = epochs
 
     def _learn(self, training_inputs, training_targets):
         for i in range(self.observation_dimension):
             self.models_[i].fit(training_inputs, training_targets[:,i])
 
     def _learn_from_stream(self, training_generator, generator_size):
-        for count in range(generator_size):
+        for count in range(self.epochs_ * generator_size):
             training_target, training_input = next(training_generator)
             assert training_input.shape[0] == self._get_input_dim()
             model_input = training_input.reshape(1, -1)

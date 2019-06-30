@@ -136,7 +136,7 @@ if __name__ == "__main__":
 
         ninducing = 1000
         minibatch_size = 1000
-        epochs = 10
+        epochs = 40
         dynamics_learner = SVGPR(history_length,
                 prediction_horizon, ninducing, minibatch_size,
                 epochs=epochs, averaging=args.averaging, streaming=args.streaming)
@@ -150,7 +150,7 @@ if __name__ == "__main__":
 
         dynamics_learner = LinearModelSGD(history_length, prediction_horizon,
             difference_learning=True, averaging=args.averaging,
-            streaming=args.streaming, settings=settings)
+            streaming=args.streaming, settings=settings, epochs=40)
     elif args.method == 'BNN':
         from DL.methods.BNN import BNNLearner
 
