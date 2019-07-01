@@ -37,7 +37,7 @@ def plot_errors(error_files, names=None, violinplot=False, setups=[]):
         ax.set_title(setup)
         ax.set_yscale("log")
         if violinplot:
-            ret = ax.violinplot(norms_array, showmeans=True, showmedians=True,
+            ret = ax.violinplot(norms_array, showmeans=True, showmedians=False,
                     showextrema=True)
         else:
             ret = ax.boxplot(norms_array, showmeans=True)
