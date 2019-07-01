@@ -11,12 +11,14 @@ from sklearn import linear_model
 class LinearModelSGD(DynamicsLearnerInterface):
 
     def __init__(self, history_length, prediction_horizon, difference_learning,
-            averaging, streaming, epochs=1, settings=None):
+            averaging, streaming, settings=None):
         super().__init__(history_length, prediction_horizon,
                 difference_learning, averaging=averaging, streaming=streaming)
         eta0 = 0.00001
+        epochs = 1
         if settings:
             eta0 = settings['eta0']
+            epochs = settings.get('epochs', 1)
         self.models_ = []
         for i in range(self.observation_dimension):
             self.models_.append(linear_model.SGDRegressor(verbose=False,

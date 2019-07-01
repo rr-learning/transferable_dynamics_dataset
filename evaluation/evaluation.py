@@ -150,7 +150,7 @@ if __name__ == "__main__":
 
         dynamics_learner = LinearModelSGD(history_length, prediction_horizon,
             difference_learning=True, averaging=args.averaging,
-            streaming=args.streaming, settings=settings, epochs=40)
+            streaming=args.streaming, settings=settings)
     elif args.method == 'BNN':
         from DL.methods.BNN import BNNLearner
 
