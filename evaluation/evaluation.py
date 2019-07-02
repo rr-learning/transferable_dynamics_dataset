@@ -85,142 +85,160 @@ def compute_RMSE_from_errors(errors):
     return np.sqrt(np.mean(squared_errors))
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
+def run(parser):
     parser.add_argument("--training_data", required=True,
-            help="<Required> filename of the input robot training data")
+                        help="<Required> filename of the input robot training data")
     parser.add_argument("--trained_model",
-            help="filename of a trained model. If specified the model won't be"
-            " trained")
+                        help="filename of a trained model. If specified the model won't be"
+                             " trained")
     parser.add_argument("--settings",
-            help="filename where the model settings are stored")
+                        help="filename where the model settings are stored")
     parser.add_argument("--validation_data",
-            help="filename of the input robot validation data")
+                        help="filename of the input robot validation data")
     parser.add_argument("--iid_test_data",
-            help="filename of the input robot iid testing data")
+                        help="filename of the input robot iid testing data")
     parser.add_argument("--transfer_test_data", nargs='+',
-            help="filename of the input robot transfer testing data")
+                        help="filename of the input robot transfer testing data")
     parser.add_argument("--method", required=True,
-            help="<Required> Name of the method that will be tested")
+                        help="<Required> Name of the method that will be tested")
     parser.add_argument("--history_length", type=int, default=1)
     parser.add_argument("--prediction_horizon", type=int, default=1)
     parser.add_argument("--output_errors",
-            help="<Required> filename where the computed errors will be saved")
+                        help="<Required> filename where the computed errors will be saved")
     parser.add_argument("--output_model",
-            help="filename where the trained model will be saved if a trained"
-            " model was not already provided in the command line.")
+                        help="filename where the trained model will be saved if a trained"
+                             " model was not already provided in the command line.")
     parser.add_argument("--averaging", dest='averaging', action='store_true')
-    parser.add_argument("--no-averaging", dest='averaging', action='store_false')
+    parser.add_argument("--no-averaging", dest='averaging',
+                        action='store_false')
     parser.add_argument("--streaming", dest='streaming', action='store_true')
-    parser.add_argument("--no-streaming", dest='streaming', action='store_false')
+    parser.add_argument("--no-streaming", dest='streaming',
+                        action='store_false')
     parser.add_argument("--verbose", action='store_true')
     parser.set_defaults(averaging=False)
     parser.set_defaults(streaming=False)
-    args = parser.parse_args()
-    history_length = args.history_length
-    prediction_horizon = args.prediction_horizon
+    arguments = parser.parse_args()
+    history_length = arguments.history_length
+    prediction_horizon = arguments.prediction_horizon
     settings = None
-    if args.settings:
-        with open(args.settings, 'r') as f:
+    if arguments.settings:
+        with open(arguments.settings, 'r') as f:
             settings = json.load(f)
     dynamics_learner = None
-    if args.method == 'example':
+    if arguments.method == 'example':
         dynamics_learner = DynamicsLearnerExample(history_length,
-                prediction_horizon, averaging=args.averaging,
-                streaming=args.streaming)
-    elif args.method == 'pilco_ninducing_500_ntraining_50000':
+                                                  prediction_horizon,
+                                                  averaging=arguments.averaging,
+                                                  streaming=arguments.streaming)
+    elif arguments.method == 'pilco_ninducing_500_ntraining_50000':
         from DL.methods.pilco_dynamics_learner import PilcoDynamicsLearner
 
         ninducing = 500
         ntraining = 50000
         dynamics_learner = PilcoDynamicsLearner(history_length,
-                prediction_horizon, ninducing, ntraining,
-                averaging=args.averaging, streaming=args.streaming)
-    elif args.method == 'SVGPR':
+                                                prediction_horizon, ninducing,
+                                                ntraining,
+                                                averaging=arguments.averaging,
+                                                streaming=arguments.streaming)
+    elif arguments.method == 'SVGPR':
         from DL.methods.SVGPR import SVGPR
 
         ninducing = 1000
         minibatch_size = 1000
         epochs = 40
         dynamics_learner = SVGPR(history_length,
-                prediction_horizon, ninducing, minibatch_size,
-                epochs=epochs, averaging=args.averaging, streaming=args.streaming)
-    elif args.method == 'linear_model_ls':
+                                 prediction_horizon, ninducing, minibatch_size,
+                                 epochs=epochs, averaging=arguments.averaging,
+                                 streaming=arguments.streaming)
+    elif arguments.method == 'linear_model_ls':
         from DL.methods.linear_regression_ls import LinearModel
 
         dynamics_learner = LinearModel(history_length, prediction_horizon,
-            averaging=args.averaging, streaming=args.streaming)
-    elif args.method == 'linear_model_sgd':
+                                       averaging=arguments.averaging,
+                                       streaming=arguments.streaming)
+    elif arguments.method == 'linear_model_sgd':
         from DL.methods.linear_regression_sgd import LinearModelSGD
 
         dynamics_learner = LinearModelSGD(history_length, prediction_horizon,
-            difference_learning=True, averaging=args.averaging,
-            streaming=args.streaming, settings=settings)
-    elif args.method == 'BNN':
+                                          difference_learning=True,
+                                          averaging=arguments.averaging,
+                                          streaming=arguments.streaming,
+                                          settings=settings)
+    elif arguments.method == 'BNN':
         from DL.methods.BNN import BNNLearner
 
         dynamics_learner = BNNLearner(history_length, prediction_horizon,
-                averaging=args.averaging, streaming=args.streaming)
-    elif args.method == 'NN':
+                                      averaging=arguments.averaging,
+                                      streaming=arguments.streaming)
+    elif arguments.method == 'NN':
         from DL.methods.nn_dynamics_learner import NNDynamicsLearner
-        settings_file = "./Settings/nn_prediction_horizon_{0}_history_length_{1}.json".format(prediction_horizon, history_length)
+        settings_file = "./Settings/nn_prediction_horizon_{0}_history_length_{1}.json".format(
+            prediction_horizon, history_length)
         exists = os.path.isfile(settings_file)
         if exists:
             with open(settings_file, 'r') as f:
                 params = json.load(f)
             dynamics_learner = NNDynamicsLearner(history_length=history_length,
-                                   prediction_horizon=prediction_horizon,
-                                   model_arch_params=params["model_arch_params"],
-                                   model_train_params=params["model_train_params"],
-                                   mode=params['mode'],
-                                   averaging=args.averaging,
-                                   streaming=args.streaming)
-    elif args.method == 'EQL':
+                                                 prediction_horizon=prediction_horizon,
+                                                 model_arch_params=params[
+                                                     "model_arch_params"],
+                                                 model_train_params=params[
+                                                     "model_train_params"],
+                                                 mode=params['mode'],
+                                                 averaging=arguments.averaging,
+                                                 streaming=arguments.streaming)
+    elif arguments.method == 'EQL':
         from DL.methods.eql_dynamics_learner import EQL
-        settings_file = "./Settings/eql_prediction_horizon_{0}_history_length_{1}.json".format(prediction_horizon, history_length)
+        settings_file = "./Settings/eql_prediction_horizon_{0}_history_length_{1}.json".format(
+            prediction_horizon, history_length)
         exists = os.path.isfile(settings_file)
         if exists:
             with open(settings_file, 'r') as f:
                 params = json.load(f)
             dynamics_learner = EQL(history_length=history_length,
-                          prediction_horizon=prediction_horizon,
-                          model_arch_params=params["model_arch_params"],
-                          model_train_params=params["model_train_params"],
-                          optional_params=params["optional_params"],
-                          averaging=args.averaging,
-                          streaming=args.streaming)
-    elif args.method == 'Eureqa':
+                                   prediction_horizon=prediction_horizon,
+                                   model_arch_params=params[
+                                       "model_arch_params"],
+                                   model_train_params=params[
+                                       "model_train_params"],
+                                   optional_params=params["optional_params"],
+                                   averaging=arguments.averaging,
+                                   streaming=arguments.streaming)
+    elif arguments.method == 'Eureqa':
         from DL.methods.eureqa_dynamics_learner import Eureqa
         dynamics_learner = Eureqa(history_length=history_length,
-                      prediction_horizon=prediction_horizon,
-                      averaging=args.averaging,
-                      streaming=args.streaming)
-    elif args.method == 'lwpr':
+                                  prediction_horizon=prediction_horizon,
+                                  averaging=arguments.averaging,
+                                  streaming=arguments.streaming)
+    elif arguments.method == 'lwpr':
         from DL.methods.LWPR import lwpr_dyn_model
         dynamics_learner = lwpr_dyn_model(history_length, prediction_horizon,
-                difference_learning=True, averaging=args.averaging,
-                streaming=args.streaming, settings=settings)
+                                          difference_learning=True,
+                                          averaging=arguments.averaging,
+                                          streaming=arguments.streaming,
+                                          settings=settings)
     assert dynamics_learner, "Make sure the method is implemented."
-    training_observations, training_actions = loadRobotData(args.training_data)
-    if args.trained_model:
+    training_observations, training_actions = loadRobotData(
+        arguments.training_data)
+    if arguments.trained_model:
         dynamics_learner.load_normalization_stats(training_observations,
-                training_actions)
-        dynamics_learner.load(args.trained_model)
+                                                  training_actions)
+        dynamics_learner.load(arguments.trained_model)
     else:
         initial_time = time.perf_counter()
         dynamics_learner.learn(training_observations, training_actions)
-        if args.verbose:
+        if arguments.verbose:
             print('Training time {} s'.format(
                 time.perf_counter() - initial_time))
-        if args.output_model:
-            dynamics_learner.save(args.output_model)
+        if arguments.output_model:
+            dynamics_learner.save(arguments.output_model)
 
     datasets = {}
-    if args.transfer_test_data:
-        for i, dataset_path in enumerate(args.transfer_test_data):
+    if arguments.transfer_test_data:
+        for i, dataset_path in enumerate(arguments.transfer_test_data):
             datasets['transfer_test_data_{}'.format(i + 1)] = dataset_path
     for dataset in ['training_data', 'iid_test_data', 'validation_data']:
-        dataset_path = getattr(args, dataset)
+        dataset_path = getattr(arguments, dataset)
         if dataset_path:
             datasets[dataset] = dataset_path
 
@@ -230,10 +248,15 @@ if __name__ == "__main__":
         dataset_path = datasets[dataset]
         testing_observations, testing_actions = loadRobotData(dataset_path)
         errors = evaluate(dynamics_learner, testing_observations,
-                testing_actions, dataset, verbose=args.verbose)
+                          testing_actions, dataset, verbose=arguments.verbose)
         set_to_errors[dataset] = errors
         print("{} error:".format(dataset))
         angle_errors = get_angle_errors(errors)
         print(compute_RMSE_from_errors(angle_errors))
-    if args.output_errors:
-        np.savez(args.output_errors, **set_to_errors)
+    if arguments.output_errors:
+        np.savez(arguments.output_errors, **set_to_errors)
+
+
+if __name__ == "__main__":
+    run(parser=argparse.ArgumentParser(description=__doc__))
+

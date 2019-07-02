@@ -19,6 +19,34 @@ from scipy.ndimage import gaussian_filter1d
 
 import rospkg
 
+# dynamics learning stuff
+from DL import DynamicsLearnerInterface
+
+
+class SystemId(DynamicsLearnerInterface):
+    def __init__(self,
+                 history_length,
+                 prediction_horizon,
+                 averaging):
+        DynamicsLearnerInterface.__init__(
+            history_length=history_length,
+            prediction_horizon=prediction_horizon,
+            difference_learning=False,
+            averaging=averaging,
+            streaming=False)
+
+        if averaging:
+            raise NotImplementedError
+
+
+
+
+    def learn(self, observation_sequences, action_sequences):
+        ipdb.set_trace()
+
+    ### TODO: here we assume that the observations and actions
+    ### have a specific order, this is not clean
+
 
 def to_matrix(array):
     matrix = np.matrix(array)
@@ -37,6 +65,7 @@ class Robot(RobotWrapper):
         self.load_urdf()
         self.viscous_friction = to_matrix(np.zeros(3)) + 0.01
         self.static_friction = to_matrix(np.zeros(3))
+
     # dynamics -----------------------------------------------------------------
     def simulate(self, n_seconds=10):
         self.initViewer(loadModel=True)
@@ -66,7 +95,6 @@ class Robot(RobotWrapper):
             v = v + a * dt
 
         return q, v, tau_horizon[-1]
-
 
     def friction_torque(self, v):
         return -(np.multiply(v, self.viscous_friction) +
@@ -170,7 +198,7 @@ def load_and_preprocess_data(desired_n_data_points=10000):
 
     # cut off ends -------------------------------------------------------------
     for key in data.keys():
-        data[key] = data[key][:, 1000 : -1000]
+        data[key] = data[key][:, 1000: -1000]
 
     # plot ---------------------------------------------------------------------
     # dim = 2
@@ -186,7 +214,7 @@ def load_and_preprocess_data(desired_n_data_points=10000):
     for key in data.keys():
         data[key] = np.reshape(data[key], [n_data_points, 3])
 
-    assert((test[23, 1032] == data['angles'][23 * test.shape[1] + 1032]).all())
+    assert ((test[23, 1032] == data['angles'][23 * test.shape[1] + 1032]).all())
 
     # return a random subset of the datapoints ---------------------------------
     data_point_indices = \
@@ -209,8 +237,8 @@ def sys_id(qq, v, a, tau):
     robot = Robot()
 
     Y = np.concatenate(
-            [robot.compute_regressor_matrix(qq[t], v[t], a[t]) for t in
-             xrange(qq.shape[0])], axis=0)
+        [robot.compute_regressor_matrix(qq[t], v[t], a[t]) for t in
+         xrange(qq.shape[0])], axis=0)
 
     T = np.concatenate(
         [to_matrix(tau[t]) for t in xrange(qq.shape[0])], axis=0)
