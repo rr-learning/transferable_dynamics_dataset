@@ -38,9 +38,6 @@ class SystemId(DynamicsLearnerInterface):
         if averaging:
             raise NotImplementedError
 
-        if not prediction_horizon == 1:
-            raise NotImplementedError
-
         self.robot = Robot()
 
     def learn(self, observation_sequences, action_sequences):
@@ -49,12 +46,15 @@ class SystemId(DynamicsLearnerInterface):
         ### we only take the commanded torques
 
         data = dict()
-        data['angles'] = observation_sequences[:, :, :3]
-        data['velocities'] = observation_sequences[:, :, 3:6]
-        data['torques'] = action_sequences
+        data['angle'] = observation_sequences[:, :, :3]
+        data['velocity'] = observation_sequences[:, :, 3:6]
+        data['torque'] = action_sequences
 
         ### TODO: adjust parameters
-        sys_id(self.robot, *preprocess_data(data, 1000, smoothing_sigma=1))
+        print('identifying....')
+        sys_id(self.robot, *preprocess_data(data=data,
+                                            desired_n_data_points=100000,
+                                            smoothing_sigma=1))
 
     def predict(self, observation_history, action_history, action_future=None):
         if action_future is None:
@@ -75,21 +75,23 @@ class SystemId(DynamicsLearnerInterface):
         predictions[:] = numpy.nan
 
         for i in xrange(n_samples):
-            angles = observation_history[i, -1, :3]
-            velocities = observation_history[i, -1, 3:6]
+            angle = observation_history[i, -1, :3]
+            velocity = observation_history[i, -1, 3:6]
             torques_sequence = action_present_future[i]
 
             integration_step_ms = max(self.prediction_horizon / 10, 1)
+
             for t in xrange(0, self.prediction_horizon, integration_step_ms):
-                angles, velocities = \
-                    self.robot.predict(angles,
-                                       velocities,
+                angle, velocity = \
+                    self.robot.predict(angle,
+                                       velocity,
                                        torques_sequence[t],
                                        integration_step_ms / 1000.)
 
-            predictions[i] = np.concatenate([np.array(angles).flatten(),
-                                            np.array(velocities).flatten(),
+            predictions[i] = np.concatenate([np.array(angle).flatten(),
+                                            np.array(velocity).flatten(),
                                             torques_sequence[-1]], axis=0)
+
 
         return predictions
 
@@ -119,57 +121,57 @@ class Robot(RobotWrapper):
     def simulate(self, n_seconds=10):
         self.initViewer(loadModel=True)
 
-        # q = pinocchio.randomConfiguration(robot.model)
-        q = np.transpose(np.matrix([1.0, -1.35, 3.0]))
-        v = pinocchio.utils.zero(self.model.nv)
-        tau = pinocchio.utils.zero(self.model.nv)
+        # angle = pinocchio.randomConfiguration(robot.model)
+        angle = np.transpose(np.matrix([1.0, -1.35, 3.0]))
+        velocity = pinocchio.utils.zero(self.model.nv)
+        torque = pinocchio.utils.zero(self.model.nv)
 
         dt = 0.01
         for _ in xrange(int(n_seconds / dt)):
-            a = self.forward_dynamics(q, v, tau)
+            acceleration = self.forward_dynamics(angle, velocity, torque)
 
-            q = q + v * dt
-            v = v + a * dt
+            angle = angle + velocity * dt
+            velocity = velocity + acceleration * dt
 
-            self.display(q)
+            self.display(angle)
             time.sleep(dt)
 
     # TODO: this needs to be checked
-    def predict(self, q, v, tau, dt):
-        q = to_matrix(q)
-        v = to_matrix(v)
-        tau = to_matrix(tau)
-        a = self.forward_dynamics(q, v, tau)
-        q = q + v * dt
-        v = v + a * dt
+    def predict(self, angle, velocity, torque, dt):
+        angle = to_matrix(angle)
+        velocity = to_matrix(velocity)
+        torque = to_matrix(torque)
+        acceleration = self.forward_dynamics(angle, velocity, torque)
+        angle = angle + velocity * dt
+        velocity = velocity + acceleration * dt
 
-        return q, v
+        return angle, velocity
 
-    def friction_torque(self, v):
-        return -(np.multiply(v, self.viscous_friction) +
-                 np.multiply(np.sign(v), self.static_friction))
+    def friction_torque(self, velocity):
+        return -(np.multiply(velocity, self.viscous_friction) +
+                 np.multiply(np.sign(velocity), self.static_friction))
 
-    def forward_dynamics(self, qq, v, actuator_torque):
-        joint_torque = actuator_torque + self.friction_torque(v)
+    def forward_dynamics(self, angle, velocity, actuator_torque):
+        joint_torque = actuator_torque + self.friction_torque(velocity)
 
-        return pinocchio.aba(self.model, self.data, qq, v, joint_torque)
+        return pinocchio.aba(self.model, self.data, angle, velocity, joint_torque)
 
-    def inverse_dynamics(self, qq, v, a):
+    def inverse_dynamics(self, angle, velocity, acceleration):
 
-        joint_torque = pinocchio.rnea(self.model, self.data, qq, v, a)
-        actuator_torque = joint_torque - self.friction_torque(v)
+        joint_torque = pinocchio.rnea(self.model, self.data, angle, velocity, acceleration)
+        actuator_torque = joint_torque - self.friction_torque(velocity)
 
         return actuator_torque
 
-    def compute_regressor_matrix(self, qq, v, a):
+    def compute_regressor_matrix(self, angle, velocity, acceleration):
         joint_torque_regressor = \
             pinocchio.computeJointTorqueRegressor(self.model, self.data,
-                                                  to_matrix(qq),
-                                                  to_matrix(v),
-                                                  to_matrix(a))
+                                                  to_matrix(angle),
+                                                  to_matrix(velocity),
+                                                  to_matrix(acceleration))
 
-        viscous_friction_torque_regressor = to_diagonal_matrix(v)
-        static_friction_torque_regressor = to_diagonal_matrix(np.sign(v))
+        viscous_friction_torque_regressor = to_diagonal_matrix(velocity)
+        static_friction_torque_regressor = to_diagonal_matrix(np.sign(velocity))
 
         regressor_matrix = np.concatenate([
             joint_torque_regressor,
@@ -215,34 +217,34 @@ class Robot(RobotWrapper):
 
 
 def test(robot):
-    q = pinocchio.randomConfiguration(robot.model)
-    v = pinocchio.utils.rand(robot.model.nv)
-    a = pinocchio.utils.rand(robot.model.nv)
+    angle = pinocchio.randomConfiguration(robot.model)
+    velocity = pinocchio.utils.rand(robot.model.nv)
+    acceleration = pinocchio.utils.rand(robot.model.nv)
 
-    Y = robot.compute_regressor_matrix(q, v, a)
+    Y = robot.compute_regressor_matrix(angle, velocity, acceleration)
     theta = robot.get_params()
     other_tau = Y * theta
 
-    tau = robot.inverse_dynamics(q, v, a)
+    torque = robot.inverse_dynamics(angle, velocity, acceleration)
 
-    assert ((abs(tau - other_tau) <= 1e-9).all())
+    assert ((abs(torque - other_tau) <= 1e-9).all())
 
 
 def load_and_preprocess_data(desired_n_data_points=10000):
     all_data = np.load('/is/ei/mwuthrich/dataset_v06_sines_full.npz')
 
     data = dict()
-    data['angles'] = all_data['measured_angles']
-    data['velocities'] = all_data['measured_velocities']
+    data['angle'] = all_data['measured_angles']
+    data['velocity'] = all_data['measured_velocities']
     ### TODO: not sure whether to take measured or constrained torques
-    data['torques'] = all_data['measured_torques']
+    data['torque'] = all_data['measured_torques']
 
     return preprocess_data(data, desired_n_data_points)
 
 
 def preprocess_data(data, desired_n_data_points, smoothing_sigma=0.0001):
-    data['accelerations'] = np.diff(data['velocities'], axis=1)
-    for key in ['angles', 'velocities', 'torques']:
+    data['acceleration'] = np.diff(data['velocity'], axis=1)
+    for key in ['angle', 'velocity', 'torque']:
         data[key] = data[key][:, :-1]
 
     # smoothen -----------------------------------------------------------------
@@ -259,18 +261,18 @@ def preprocess_data(data, desired_n_data_points, smoothing_sigma=0.0001):
     # plot ---------------------------------------------------------------------
     # dim = 2
     # sample = 100
-    # for key in ['torques']:
+    # for key in ['torque']:
     #     plt.plot(data[key][sample, :, dim])
     #     plt.plot(data['smooth_' + key][sample, :, dim])
     # plt.show()
 
     # reshape ------------------------------------------------------------------
-    n_data_points = data['angles'].shape[0] * data['angles'].shape[1]
-    test = np.copy(data['angles'])
+    n_data_points = data['angle'].shape[0] * data['angle'].shape[1]
+    test = np.copy(data['angle'])
     for key in data.keys():
         data[key] = np.reshape(data[key], [n_data_points, 3])
 
-    assert ((test[23, 1032] == data['angles'][23 * test.shape[1] + 1032]).all())
+    assert ((test[23, 1032] == data['angle'][23 * test.shape[1] + 1032]).all())
 
     # return a random subset of the datapoints ---------------------------------
     data_point_indices = \
@@ -279,8 +281,8 @@ def preprocess_data(data, desired_n_data_points, smoothing_sigma=0.0001):
     for key in data.keys():
         data[key] = data[key][data_point_indices]
 
-    return data['smooth_angles'], data['smooth_velocities'], \
-           data['smooth_accelerations'], data['smooth_torques']
+    return data['smooth_angle'], data['smooth_velocity'], \
+           data['smooth_acceleration'], data['smooth_torque']
 
 
 def satisfies_normal_equation(theta, Y, T, epsilon=1e-6):
@@ -289,13 +291,13 @@ def satisfies_normal_equation(theta, Y, T, epsilon=1e-6):
     return (abs(lhs - rhs) < epsilon).all()
 
 
-def sys_id(robot, qq, v, a, tau):
+def sys_id(robot, angle, velocity, acceleration, torque):
     Y = np.concatenate(
-        [robot.compute_regressor_matrix(qq[t], v[t], a[t]) for t in
-         xrange(qq.shape[0])], axis=0)
+        [robot.compute_regressor_matrix(angle[t], velocity[t], acceleration[t]) for t in
+         xrange(angle.shape[0])], axis=0)
 
     T = np.concatenate(
-        [to_matrix(tau[t]) for t in xrange(qq.shape[0])], axis=0)
+        [to_matrix(torque[t]) for t in xrange(angle.shape[0])], axis=0)
 
     regularization_epsilon = 1e-12
     regularization_mu = np.matrix(np.zeros(Y.shape[1]) + 1e-6).transpose()

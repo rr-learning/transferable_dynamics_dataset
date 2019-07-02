@@ -263,6 +263,8 @@ def run(parser):
     for dataset in sorted(datasets.keys()):
         dataset_path = datasets[dataset]
         testing_observations, testing_actions = loadRobotData(dataset_path)
+        print("evaluating on ", dataset_path, testing_observations.shape)
+
         errors = evaluate(dynamics_learner, testing_observations,
                           testing_actions, dataset, verbose=arguments.verbose)
         set_to_errors[dataset] = errors
@@ -274,15 +276,15 @@ def run(parser):
 
 
 if __name__ == "__main__":
-    run(parser=argparse.ArgumentParser(description=__doc__))
+    # run(parser=argparse.ArgumentParser(description=__doc__))
 
 
-    # import ipdb
-    # import traceback
-    # try:
-    #     run(parser=argparse.ArgumentParser(description=__doc__))
-    # except:
-    #     traceback.print_exc(sys.stdout)
-    #     _, _, tb = sys.exc_info()
-    #     ipdb.post_mortem(tb)
+    import ipdb
+    import traceback
+    try:
+        run(parser=argparse.ArgumentParser(description=__doc__))
+    except:
+        traceback.print_exc(sys.stdout)
+        _, _, tb = sys.exc_info()
+        ipdb.post_mortem(tb)
 
