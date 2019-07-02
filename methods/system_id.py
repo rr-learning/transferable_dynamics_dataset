@@ -43,7 +43,6 @@ class SystemId(DynamicsLearnerInterface):
 
         self.robot = Robot()
 
-
     def learn(self, observation_sequences, action_sequences):
         ### TODO: here we assume that the observations and actions
         ### have a specific order. furthermore, we ignore the measured torques,
@@ -57,18 +56,45 @@ class SystemId(DynamicsLearnerInterface):
         ### TODO: adjust parameters
         sys_id(self.robot, *preprocess_data(data, 1000, smoothing_sigma=1))
 
-
     def predict(self, observation_history, action_history, action_future=None):
-        for i in xrange(observation_history.shape[0]):
+        if action_future is None:
+            assert self.prediction_horizon == 1
+            action_future = np.empty((observation_history.shape[0],
+                                      0,
+                                      self.action_dimension))
+        assert (action_future.shape[1] == self.prediction_horizon - 1)
+
+        n_samples = observation_history.shape[0]
+        dim_observation = observation_history.shape[2]
+
+        action_present_future = np.append(action_history[:, -1:],
+                                          action_future,
+                                          axis=1)
+
+        predictions = np.empty((n_samples, dim_observation))
+        predictions[:] = numpy.nan
+
+        for i in xrange(n_samples):
             angles = observation_history[i, -1, :3]
             velocities = observation_history[i, -1, 3:6]
+            torques_sequence = action_present_future[i]
 
-            torques = action_history[i, -1]
+            integration_step_ms = max(self.prediction_horizon / 10, 1)
+            for t in xrange(0, self.prediction_horizon, integration_step_ms):
+                angles, velocities = \
+                    self.robot.predict(angles,
+                                       velocities,
+                                       torques_sequence[t],
+                                       integration_step_ms / 1000.)
 
-            robot.predict()
+            predictions[i] = np.concatenate([np.array(angles).flatten(),
+                                            np.array(velocities).flatten(),
+                                            torques_sequence[-1]], axis=0)
 
-            ipdb.set_trace()
+        return predictions
 
+    def name(self):
+        return 'system_id'
 
 
 def to_matrix(array):
@@ -109,13 +135,15 @@ class Robot(RobotWrapper):
             time.sleep(dt)
 
     # TODO: this needs to be checked
-    def predict(self, q, v, tau_horizon, dt):
-        for t in xrange(tau_horizon.shape[0]):
-            a = self.forward_dynamics(q, v, tau_horizon[t])
-            q = q + v * dt
-            v = v + a * dt
+    def predict(self, q, v, tau, dt):
+        q = to_matrix(q)
+        v = to_matrix(v)
+        tau = to_matrix(tau)
+        a = self.forward_dynamics(q, v, tau)
+        q = q + v * dt
+        v = v + a * dt
 
-        return q, v, tau_horizon[-1]
+        return q, v
 
     def friction_torque(self, v):
         return -(np.multiply(v, self.viscous_friction) +
@@ -279,7 +307,6 @@ def sys_id(robot, qq, v, a, tau):
     robot.set_params(theta)
 
     assert (satisfies_normal_equation(robot.get_params(), Y, T))
-
 
 
 if __name__ == '__main__':
