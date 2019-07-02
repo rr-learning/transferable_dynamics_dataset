@@ -28,29 +28,32 @@ def plot_errors(error_files, names=None, violinplot=False, setups=[]):
             from_setup_to_norms[setup].append(norms)
             from_setup_to_RMSEs[setup].append(compute_RMSE_from_errors(
                 np_errors))
-    plt.figure(figsize=(16,4))
     if len(setups) == 0:
         setups = from_setup_to_norms.keys()
+    fig, axs = plt.subplots(1, len(from_setup_to_norms.keys()), sharey=True, figsize=(20,4))
     for i, setup in enumerate(setups):
         norms_array = from_setup_to_norms[setup]
-        ax = plt.subplot(1, len(from_setup_to_norms.keys()), i + 1)
+        ax = axs[i]
         ax.set_title(setup)
         ax.set_yscale("log")
         if violinplot:
-            ret = ax.violinplot(norms_array, showmeans=True, showmedians=False,
+            ret = ax.violinplot(norms_array, showmeans=True, showmedians=True,
                     showextrema=True)
+            ret['cmeans'].set_color('r')
+            ret['cmedians'].set_color('b')
         else:
             ret = ax.boxplot(norms_array, showmeans=True)
         if names:
             ax.set_xticks([y+1 for y in range(len(error_files))])
             ax.set_xticklabels(names, rotation=45, fontsize=8)
-        red_patch = mpatches.Patch(color='black')
-        patches = [red_patch] * len(error_files)
-        entries = from_setup_to_RMSEs[setup]
-        if names:
-            entries = ["{}={:.8f}".format(x,y) for x,y in zip(names, entries)]
-        ax.legend(patches, entries, loc='lower left', bbox_to_anchor= (0.0, 1.1))
+        # red_patch = mpatches.Patch(color='black')
+        # patches = [red_patch] * len(error_files)
+        # entries = from_setup_to_RMSEs[setup]
+        # if names:
+        #     entries = ["{}={:.8f}".format(x,y) for x,y in zip(names, entries)]
+        # ax.legend(patches, entries, loc='lower left', bbox_to_anchor= (0.0, 1.1))
     plt.show()
+    return fig
 
 
 if __name__ == "__main__":
