@@ -31,6 +31,7 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
                            len(T),
                            observation_sequences.shape[2]))
         times = []
+        init_pred_time = time.perf_counter()
         for i in range(len(T)):
             t = T[i]
             observation_history = observation_sequences[:, t + 1 - history_length: t + 1]
@@ -44,10 +45,14 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
             times.append(time.perf_counter() - start_time)
             true_observation = observation_sequences[:, t + prediction_horizon]
             errors[:, i] = true_observation - observation_prediction
+        end_pred_time = time.perf_counter()
         if verbose:
             times = np.array(times)
-            print('Elapsed time for dataset {}: {} +- {}'.format(
+            print('Number of predict calls {}'.format(len(times)))
+            print('Elapsed time for predict call {}: {} +- {}'.format(
                     test_dataset_name, np.mean(times), np.std(times)))
+            print('Total prediction time {}'.format(
+                    end_pred_time - init_pred_time))
 
         errors_key = test_dataset_name + '__history_' + str(history_length) + \
                 '__training_horizon_' + \
