@@ -28,7 +28,7 @@ class SystemId(DynamicsLearnerInterface):
                  history_length,
                  prediction_horizon,
                  averaging):
-        DynamicsLearnerInterface.__init__(
+        DynamicsLearnerInterface.__init__(self,
             history_length=history_length,
             prediction_horizon=prediction_horizon,
             difference_learning=False,

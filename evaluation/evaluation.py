@@ -6,9 +6,19 @@ import json
 import argparse
 import numpy as np
 import time
+
+import sys
+
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerExample
 from DL.utils import Standardizer
 from DL.utils.data_loading import loadRobotData
+
+
+# hack because if have to use python 2.7 and it does not seem to have perf_counter
+if sys.version_info[0] < 3:
+    def return_0():
+        return 0
+    time.perf_counter = return_0
 
 
 def evaluate(dynamics_learner, observation_sequences, action_sequences,
@@ -217,6 +227,12 @@ def run(parser):
                                           averaging=arguments.averaging,
                                           streaming=arguments.streaming,
                                           settings=settings)
+    elif arguments.method == 'system_id':
+        from DL.methods.system_id import SystemId
+        dynamics_learner = SystemId(history_length=arguments.history_length,
+                                    prediction_horizon=arguments.prediction_horizon,
+                                    averaging=arguments.averaging)
+
     assert dynamics_learner, "Make sure the method is implemented."
     training_observations, training_actions = loadRobotData(
         arguments.training_data)
@@ -259,4 +275,14 @@ def run(parser):
 
 if __name__ == "__main__":
     run(parser=argparse.ArgumentParser(description=__doc__))
+
+
+    # import ipdb
+    # import traceback
+    # try:
+    #     run(parser=argparse.ArgumentParser(description=__doc__))
+    # except:
+    #     traceback.print_exc(sys.stdout)
+    #     _, _, tb = sys.exc_info()
+    #     ipdb.post_mortem(tb)
 
