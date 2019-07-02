@@ -8,6 +8,8 @@ import numpy as np
 import numpy.matlib
 import time
 
+import math
+
 import matplotlib.pylab as plt
 
 import pinocchio
@@ -89,9 +91,8 @@ class SystemId(DynamicsLearnerInterface):
                                        integration_step_ms / 1000.)
 
             predictions[i] = np.concatenate([np.array(angle).flatten(),
-                                            np.array(velocity).flatten(),
-                                            torques_sequence[-1]], axis=0)
-
+                                             np.array(velocity).flatten(),
+                                             torques_sequence[-1]], axis=0)
 
         return predictions
 
@@ -136,6 +137,15 @@ class Robot(RobotWrapper):
             self.display(angle)
             time.sleep(dt)
 
+    def show_trajectory(self, angle, dt=0.001):
+        self.initViewer(loadModel=True)
+
+        for t in xrange(angle.shape[0]):
+            self.display(to_matrix(angle[t]))
+            time.sleep(dt)
+
+            print(angle[t])
+
     # TODO: this needs to be checked
     def predict(self, angle, velocity, torque, dt):
         angle = to_matrix(angle)
@@ -148,18 +158,29 @@ class Robot(RobotWrapper):
         return angle, velocity
 
     def friction_torque(self, velocity):
+        velocity = to_matrix(velocity)
         return -(np.multiply(velocity, self.viscous_friction) +
                  np.multiply(np.sign(velocity), self.static_friction))
 
     def forward_dynamics(self, angle, velocity, actuator_torque):
         joint_torque = actuator_torque + self.friction_torque(velocity)
 
-        return pinocchio.aba(self.model, self.data, angle, velocity, joint_torque)
+        return pinocchio.aba(self.model, self.data, angle, velocity,
+                             joint_torque)
 
     def inverse_dynamics(self, angle, velocity, acceleration):
 
-        joint_torque = pinocchio.rnea(self.model, self.data, angle, velocity, acceleration)
+        joint_torque = pinocchio.rnea(self.model, self.data,
+                                      to_matrix(angle),
+                                      to_matrix(velocity),
+                                      to_matrix(acceleration))
         actuator_torque = joint_torque - self.friction_torque(velocity)
+
+        # just as a sanity check -----------------------------------------------
+        Y = self.compute_regressor_matrix(angle, velocity, acceleration)
+        actuator_torque_1 = Y * self.get_params()
+        assert ((abs(actuator_torque - actuator_torque_1) <= 1e-9).all())
+        # ----------------------------------------------------------------------
 
         return actuator_torque
 
@@ -216,18 +237,19 @@ class Robot(RobotWrapper):
         self.initFromURDF(urdf_path, meshes_path)
 
 
-def test(robot):
-    angle = pinocchio.randomConfiguration(robot.model)
-    velocity = pinocchio.utils.rand(robot.model.nv)
-    acceleration = pinocchio.utils.rand(robot.model.nv)
+def test_regressor_matrix(robot):
+    for _ in xrange(100):
+        angle = pinocchio.randomConfiguration(robot.model)
+        velocity = pinocchio.utils.rand(robot.model.nv)
+        acceleration = pinocchio.utils.rand(robot.model.nv)
 
-    Y = robot.compute_regressor_matrix(angle, velocity, acceleration)
-    theta = robot.get_params()
-    other_tau = Y * theta
+        Y = robot.compute_regressor_matrix(angle, velocity, acceleration)
+        theta = robot.get_params()
+        other_tau = Y * theta
 
-    torque = robot.inverse_dynamics(angle, velocity, acceleration)
+        torque = robot.inverse_dynamics(angle, velocity, acceleration)
 
-    assert ((abs(torque - other_tau) <= 1e-9).all())
+        assert ((abs(torque - other_tau) <= 1e-9).all())
 
 
 def load_and_preprocess_data(desired_n_data_points=10000):
@@ -235,14 +257,30 @@ def load_and_preprocess_data(desired_n_data_points=10000):
 
     data = dict()
     data['angle'] = all_data['measured_angles']
+
+    robot = Robot()
+
+    angle = np.zeros([100, 3])
+    angle[:, 1] = np.linspace(0, math.pi, 100)
+
+    robot.show_trajectory(angle=angle,
+                          dt=0.1)
+
+    robot.show_trajectory(angle=data['angle'][100],
+                          dt=0.001)
+
+
+
     data['velocity'] = all_data['measured_velocities']
     ### TODO: not sure whether to take measured or constrained torques
     data['torque'] = all_data['measured_torques']
 
-    return preprocess_data(data, desired_n_data_points)
+    return preprocess_data(data=data,
+                           desired_n_data_points=desired_n_data_points,
+                           smoothing_sigma=5)
 
 
-def preprocess_data(data, desired_n_data_points, smoothing_sigma=0.0001):
+def preprocess_data(data, desired_n_data_points, smoothing_sigma):
     data['acceleration'] = np.diff(data['velocity'], axis=1)
     for key in ['angle', 'velocity', 'torque']:
         data[key] = data[key][:, :-1]
@@ -291,30 +329,104 @@ def satisfies_normal_equation(theta, Y, T, epsilon=1e-6):
     return (abs(lhs - rhs) < epsilon).all()
 
 
+def rmse_sequential(robot, angle, velocity, acceleration, torque):
+    sum_squared_error = 0
+
+    T = angle.shape[0]
+
+    for t in xrange(T):
+        predicted_torque = robot.inverse_dynamics(angle=angle[t],
+                                                  velocity=velocity[t],
+                                                  acceleration=acceleration[t])
+        sum_squared_error = sum_squared_error \
+                            + np.linalg.norm(
+            predicted_torque - to_matrix(torque[t])) ** 2
+
+    mean_squared_error = sum_squared_error / T / 3
+
+    return np.sqrt(mean_squared_error)
+
+
+def rmse_batch(theta, Y, T):
+    return np.squeeze(np.sqrt(
+        (Y * theta - T).transpose().dot(Y * theta - T) / len(T)))
+
+
 def sys_id(robot, angle, velocity, acceleration, torque):
+    log = dict()
+
+    test_regressor_matrix(robot)
+
     Y = np.concatenate(
-        [robot.compute_regressor_matrix(angle[t], velocity[t], acceleration[t]) for t in
+        [robot.compute_regressor_matrix(angle[t], velocity[t], acceleration[t])
+         for t in
          xrange(angle.shape[0])], axis=0)
 
     T = np.concatenate(
         [to_matrix(torque[t]) for t in xrange(angle.shape[0])], axis=0)
 
-    regularization_epsilon = 1e-12
+    log['rmse_sequential_before_id'] = rmse_sequential(robot=robot,
+                                                       angle=angle,
+                                                       velocity=velocity,
+                                                       acceleration=acceleration,
+                                                       torque=torque)
+    log['rmse_batch_before_id'] = rmse_batch(theta=robot.get_params(),
+                                             Y=Y, T=T)
+
+    regularization_epsilon = 1e-30
     regularization_mu = np.matrix(np.zeros(Y.shape[1]) + 1e-6).transpose()
     theta = np.linalg.solve(
         Y.transpose() * Y + regularization_epsilon * np.eye(Y.shape[1],
                                                             Y.shape[1]),
         Y.transpose() * T + regularization_epsilon * regularization_mu)
 
+    log['rmse_batch_optimal_theta_after_id'] = rmse_batch(theta=theta,
+                                                          Y=Y, T=T)
+
     robot.set_params(theta)
 
     assert (satisfies_normal_equation(robot.get_params(), Y, T))
+    test_regressor_matrix(robot)
+
+    log['rmse_sequential_after_id'] = rmse_sequential(robot=robot,
+                                                      angle=angle,
+                                                      velocity=velocity,
+                                                      acceleration=acceleration,
+                                                      torque=torque)
+    log['rmse_batch_after_id'] = rmse_batch(theta=robot.get_params(), Y=Y, T=T)
+
+    for key in log.keys():
+        print(key + ': ', log[key], '\n')
+
+
+def test_sys_id():
+    robot = Robot()
+    test_regressor_matrix(robot)
+
+    angle, velocity, acceleration, _ = load_and_preprocess_data()
+    torque = [robot.inverse_dynamics(angle=angle[t],
+                                     velocity=velocity[t],
+                                     acceleration=acceleration[t])
+              for t in xrange(angle.shape[0])]
+
+    sys_id(robot=robot,
+           angle=angle,
+           velocity=velocity,
+           acceleration=acceleration,
+           torque=torque)
+
+    assert(rmse_sequential(robot=robot,
+                           angle=angle,
+                           velocity=velocity,
+                           acceleration=acceleration,
+                           torque=torque) < 1e-10)
+
+    ipdb.set_trace()
 
 
 if __name__ == '__main__':
     try:
-        robot = Robot()
-        test(robot)
+        test_sys_id()
 
         sys_id(robot, *load_and_preprocess_data())
     except:
