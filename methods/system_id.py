@@ -38,6 +38,9 @@ class SystemId(DynamicsLearnerInterface):
         if averaging:
             raise NotImplementedError
 
+        if not prediction_horizon == 1:
+            raise NotImplementedError
+
         self.robot = Robot()
 
 
@@ -54,9 +57,18 @@ class SystemId(DynamicsLearnerInterface):
         ### TODO: adjust parameters
         sys_id(self.robot, *preprocess_data(data, 1000, smoothing_sigma=1))
 
-        self.robot.simulate(1000)
 
-        ipdb.set_trace()
+    def predict(self, observation_history, action_history, action_future=None):
+        for i in xrange(observation_history.shape[0]):
+            angles = observation_history[i, -1, :3]
+            velocities = observation_history[i, -1, 3:6]
+
+            torques = action_history[i, -1]
+
+            robot.predict()
+
+            ipdb.set_trace()
+
 
 
 def to_matrix(array):
