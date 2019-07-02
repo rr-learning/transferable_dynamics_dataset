@@ -19,9 +19,11 @@ class lwpr_dyn_model(DynamicsLearnerInterface):
         # Default values.
         init_D = 20
         init_alpha = 100
+        self.number_training_points = None
         if settings:
             init_D = settings['init_D']
             init_alpha = settings['init_alpha']
+            self.number_training_points = settings.get('n_training', None)
         self.model_.init_D = init_D * np.eye(self._get_input_dim())
         self.model_.init_alpha = init_alpha * np.eye(self._get_input_dim())
 
@@ -35,9 +37,11 @@ class lwpr_dyn_model(DynamicsLearnerInterface):
                 training_inputs.shape[0])
 
     def _learn_from_stream(self, training_generator, generator_size):
-        for count in range(generator_size):
-            if count % 1000 == 0:
-                print('iter: ', count)
+
+        limit = generator_size
+        if self.number_training_points:
+            limit = min(limit, self.number_training_points)
+        for count in range(limit):
             training_target, training_input = next(training_generator)
             assert training_input.shape[0] == self._get_input_dim()
             assert training_target.shape[0] == self.observation_dimension
