@@ -29,23 +29,34 @@ class SystemId(DynamicsLearnerInterface):
                  prediction_horizon,
                  averaging):
         DynamicsLearnerInterface.__init__(self,
-            history_length=history_length,
-            prediction_horizon=prediction_horizon,
-            difference_learning=False,
-            averaging=averaging,
-            streaming=False)
+                                          history_length=history_length,
+                                          prediction_horizon=prediction_horizon,
+                                          difference_learning=False,
+                                          averaging=averaging,
+                                          streaming=False)
 
         if averaging:
             raise NotImplementedError
 
-
+        self.robot = Robot()
 
 
     def learn(self, observation_sequences, action_sequences):
-        ipdb.set_trace()
+        ### TODO: here we assume that the observations and actions
+        ### have a specific order. furthermore, we ignore the measured torques,
+        ### we only take the commanded torques
 
-    ### TODO: here we assume that the observations and actions
-    ### have a specific order, this is not clean
+        data = dict()
+        data['angles'] = observation_sequences[:, :, :3]
+        data['velocities'] = observation_sequences[:, :, 3:6]
+        data['torques'] = action_sequences
+
+        ### TODO: adjust parameters
+        sys_id(self.robot, *preprocess_data(data, 1000, smoothing_sigma=1))
+
+        self.robot.simulate(1000)
+
+        ipdb.set_trace()
 
 
 def to_matrix(array):
@@ -81,8 +92,6 @@ class Robot(RobotWrapper):
 
             q = q + v * dt
             v = v + a * dt
-
-            print(q)
 
             self.display(q)
             time.sleep(dt)
@@ -187,14 +196,21 @@ def load_and_preprocess_data(desired_n_data_points=10000):
     data['velocities'] = all_data['measured_velocities']
     ### TODO: not sure whether to take measured or constrained torques
     data['torques'] = all_data['measured_torques']
+
+    return preprocess_data(data, desired_n_data_points)
+
+
+def preprocess_data(data, desired_n_data_points, smoothing_sigma=0.0001):
     data['accelerations'] = np.diff(data['velocities'], axis=1)
     for key in ['angles', 'velocities', 'torques']:
         data[key] = data[key][:, :-1]
 
     # smoothen -----------------------------------------------------------------
-    sigma = 5
     for key in data.keys():
-        data['smooth_' + key] = gaussian_filter1d(data[key], sigma=5, axis=1)
+        data['smooth_' + key] = \
+            gaussian_filter1d(data[key],
+                              sigma=smoothing_sigma,
+                              axis=1)
 
     # cut off ends -------------------------------------------------------------
     for key in data.keys():
@@ -233,9 +249,7 @@ def satisfies_normal_equation(theta, Y, T, epsilon=1e-6):
     return (abs(lhs - rhs) < epsilon).all()
 
 
-def sys_id(qq, v, a, tau):
-    robot = Robot()
-
+def sys_id(robot, qq, v, a, tau):
     Y = np.concatenate(
         [robot.compute_regressor_matrix(qq[t], v[t], a[t]) for t in
          xrange(qq.shape[0])], axis=0)
@@ -254,7 +268,6 @@ def sys_id(qq, v, a, tau):
 
     assert (satisfies_normal_equation(robot.get_params(), Y, T))
 
-    robot.simulate(1000)
 
 
 if __name__ == '__main__':
@@ -262,7 +275,7 @@ if __name__ == '__main__':
         robot = Robot()
         test(robot)
 
-        sys_id(*load_and_preprocess_data())
+        sys_id(robot, *load_and_preprocess_data())
     except:
         traceback.print_exc(sys.stdout)
         _, _, tb = sys.exc_info()
