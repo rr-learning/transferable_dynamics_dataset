@@ -310,12 +310,14 @@ def load_data():
 
     return data
 
+
 def compute_accelerations(data):
     data['acceleration'] = np.diff(data['velocity'], axis=1)
     for key in ['angle', 'velocity', 'torque']:
         data[key] = data[key][:, :-1]
 
     return data
+
 
 def preprocess_data(data, desired_n_data_points,
                     smoothing_sigma=None, shuffle_data=True):
@@ -328,7 +330,7 @@ def preprocess_data(data, desired_n_data_points,
 
     # cut off ends -------------------------------------------------------------
     for key in data.keys():
-        data[key] = data[key][:, 1000: -1000]
+        data[key] = data[key][:, data[key].shape[1]/10: -data[key].shape[1]/10]
 
     # plot ---------------------------------------------------------------------
     # dim = 2
@@ -449,17 +451,26 @@ def test_sys_id_simumlated_torques():
     robot = Robot()
     test_regressor_matrix(robot)
 
+    # create dataset with simulated torques ------------------------------------
     data = load_data()
     data = compute_accelerations(data)
+    for key in data.keys():
+        data[key] = data[key][:, 10000: 10200]
+
+    data['torque'] = [[robot.inverse_dynamics(
+        angle=data['angle'][trajectory_idx, t],
+        velocity=data['velocity'][trajectory_idx, t],
+        acceleration=data['acceleration'][trajectory_idx, t])
+        for t in xrange(data['angle'].shape[1])]
+        for trajectory_idx in xrange(data['angle'].shape[0])]
+    data['torque'] = np.array(data['torque']).squeeze()
+
+    # the usual preprocessing --------------------------------------------------
     data = preprocess_data(data=data,
                            desired_n_data_points=10000,
                            smoothing_sigma=None)
-    data['torque'] = [
-        robot.inverse_dynamics(angle=data['angle'][t],
-                               velocity=data['velocity'][t],
-                               acceleration=data['acceleration'][t])
-        for t in xrange(data['angle'].shape[0])]
 
+    # identify -----------------------------------------------------------------
     sys_id(robot=robot,
            angle=data['angle'],
            velocity=data['velocity'],
@@ -499,8 +510,8 @@ def test_sys_id_visually():
 
 if __name__ == '__main__':
     try:
-        test_sys_id_visually()
         test_sys_id_simumlated_torques()
+        test_sys_id_visually()
 
     except:
         traceback.print_exc(sys.stdout)
