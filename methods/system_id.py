@@ -21,9 +21,7 @@ from scipy.ndimage import gaussian_filter1d
 
 import rospkg
 
-
 import time
-
 
 # dynamics learning stuff
 from DL import DynamicsLearnerInterface
@@ -124,38 +122,47 @@ class Robot(RobotWrapper):
 
     # dynamics -----------------------------------------------------------------
     def simulate(self,
+                 dt,
+                 n_steps=None,
+                 torque=None,
                  initial_angle=None,
                  initial_velocity=None,
-                 torque=None,
                  mask=np.ones(3),
-                 n_seconds=100,
-                 dt=0.01):
-
-        self.initViewer(loadModel=True)
-
+                 verbose=False):
         zero = pinocchio.utils.zero(self.model.nv)
+
+        torque = np.array(torque) if torque else np.array(zero)
+        torque = torque.reshape(-1, 3, 1)
+        if torque.shape[0] == 1:
+            assert(n_steps)
+            torque = np.repeat(torque, repeats=n_steps, axis=0)
+        elif n_steps:
+            assert(n_steps == torque.shape[0])
+
         angle = to_matrix(initial_angle) if initial_angle else zero
         velocity = to_matrix(initial_velocity) if initial_velocity else zero
-        torque = to_matrix(torque) if torque else zero
         mask = to_matrix(mask)
 
+        self.initViewer(loadModel=True)
         last_time = time.time()
-        for _ in xrange(int(n_seconds / dt)):
-            acceleration = self.forward_dynamics(angle, velocity, torque)
+        for t in xrange(torque.shape[0]):
+            acceleration = self.forward_dynamics(angle, velocity, torque[t])
 
             angle = angle + np.multiply(mask, velocity * dt)
             velocity = velocity + np.multiply(mask, acceleration * dt)
 
             self.display(angle)
-            print('angle: ', np.array(angle).flatten(),
-                  '\nvelocity: ', np.array(velocity).flatten())
+            if verbose:
+                print('angle: ', np.array(angle).flatten(),
+                      '\nvelocity: ', np.array(velocity).flatten())
 
             sleep_time = last_time + dt - time.time()
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
             current_time = time.time()
-            print('time elapsed in cycle', current_time - last_time)
+            if verbose:
+                print('time elapsed in cycle', current_time - last_time)
             last_time = current_time
 
     def show_trajectory(self, angle, dt=0.001):
@@ -293,6 +300,13 @@ def load_and_preprocess_data(desired_n_data_points=10000):
     data['velocity'] = all_data['measured_velocities']
     ### TODO: not sure whether to take measured or constrained torques
     data['torque'] = all_data['measured_torques']
+
+
+    robot = Robot()
+    sample_idx = 23
+
+    robot.simulate(torque=data['torque'][sample_idx],
+                   initial_angle=data['angle'][sample_idx,0])
 
     return preprocess_data(data=data,
                            desired_n_data_points=desired_n_data_points,
@@ -443,11 +457,11 @@ def test_sys_id_simumlated_torques():
 
 def test_sys_id_visually():
     robot = Robot()
-    robot.simulate(initial_angle=[1, 1, 1],
-                   torque=[0., 0., 0.],
-                   mask=[1, 1, 1],
-                   n_seconds=100,
-                   dt=0.001)
+    # robot.simulate(dt=0.001,
+    #                n_steps=1000,
+    #                torque=[0.1, 0.1, 0.1],
+    #                initial_angle=[1, 1, 1],
+    #                mask=[1, 1, 1])
 
     angle, velocity, acceleration, torque = load_and_preprocess_data()
 
