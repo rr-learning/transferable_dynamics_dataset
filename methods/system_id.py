@@ -289,56 +289,42 @@ def test_regressor_matrix(robot):
         assert ((abs(torque - other_tau) <= 1e-9).all())
 
 
-def load_and_preprocess_data(desired_n_data_points=10000):
+def load_data():
     all_data = np.load('/is/ei/mwuthrich/dataset_v06_sines_full.npz')
 
     data = dict()
     data['angle'] = all_data['measured_angles']
-
-    # robot = Robot()
-    # #
-    # # angle = np.zeros([100, 3])
-    # # angle[:, 1] = np.linspace(0, math.pi, 100)
-    # #
-    # # robot.show_trajectory(angle=angle,
-    # #                       dt=0.1)
-    #
-    # robot.show_trajectory(angle=data['angle'][100],
-    #                       dt=0.001)
-
     data['velocity'] = all_data['measured_velocities']
     ### TODO: not sure whether to take measured or constrained torques
     data['torque'] = all_data['constrained_torques']
 
-    robot = Robot()
-    sample_idx = 113
+    # robot = Robot()
+    # sample_idx = 113
+    # robot.show_trajectory(dt=0.001,
+    #                       angle=data['angle'][sample_idx, :2000])
+    #
+    # robot.simulate(dt=0.001,
+    #                torque=data['torque'][sample_idx, :2000],
+    #                initial_angle=data['angle'][sample_idx, 0],
+    #                initial_velocity=data['velocity'][sample_idx, 0])
 
-    robot.show_trajectory(dt=0.001,
-                          angle=data['angle'][sample_idx, :2000])
+    return data
 
-    robot.simulate(dt=0.001,
-                   torque=data['torque'][sample_idx, :2000],
-                   initial_angle=data['angle'][sample_idx, 0],
-                   initial_velocity=data['velocity'][sample_idx, 0])
-
-
-
-    return preprocess_data(data=data,
-                           desired_n_data_points=desired_n_data_points,
-                           smoothing_sigma=5)
-
-
-def preprocess_data(data, desired_n_data_points, smoothing_sigma):
+def compute_accelerations(data):
     data['acceleration'] = np.diff(data['velocity'], axis=1)
     for key in ['angle', 'velocity', 'torque']:
         data[key] = data[key][:, :-1]
 
+    return data
+
+def preprocess_data(data, desired_n_data_points,
+                    smoothing_sigma=None, shuffle_data=True):
     # smoothen -----------------------------------------------------------------
-    for key in data.keys():
-        data['smooth_' + key] = \
-            gaussian_filter1d(data[key],
-                              sigma=smoothing_sigma,
-                              axis=1)
+    if smoothing_sigma is not None:
+        for key in data.keys():
+            data[key] = gaussian_filter1d(data[key],
+                                          sigma=smoothing_sigma,
+                                          axis=1)
 
     # cut off ends -------------------------------------------------------------
     for key in data.keys():
@@ -353,22 +339,34 @@ def preprocess_data(data, desired_n_data_points, smoothing_sigma):
     # plt.show()
 
     # reshape ------------------------------------------------------------------
-    n_data_points = data['angle'].shape[0] * data['angle'].shape[1]
-    test = np.copy(data['angle'])
+    ordered_data = data.copy()
+    n_trajectories = data['angle'].shape[0]
+    n_time_steps = data['angle'].shape[1]
+    n_data_points = n_trajectories * n_time_steps
     for key in data.keys():
         data[key] = np.reshape(data[key], [n_data_points, 3])
 
-    assert ((test[23, 1032] == data['angle'][23 * test.shape[1] + 1032]).all())
+    for _ in xrange(10):
+        trajectory_idx = np.random.randint(n_trajectories)
+        time_step = np.random.randint(n_time_steps)
+
+        global_idx = trajectory_idx * n_time_steps + time_step
+
+        for key in data.keys():
+            assert ((ordered_data[key][trajectory_idx, time_step] ==
+                     data[key][global_idx]).all())
 
     # return a random subset of the datapoints ---------------------------------
-    data_point_indices = \
-        np.random.permutation(np.arange(n_data_points))[:desired_n_data_points]
+    data_point_indices = np.arange(n_data_points)
+    if shuffle_data:
+        data_point_indices = np.random.permutation(data_point_indices)
+
+    data_point_indices = data_point_indices[:desired_n_data_points]
 
     for key in data.keys():
         data[key] = data[key][data_point_indices]
 
-    return data['smooth_angle'], data['smooth_velocity'], \
-           data['smooth_acceleration'], data['smooth_torque']
+    return data
 
 
 def satisfies_normal_equation(theta, Y, T, epsilon=1e-6):
@@ -421,8 +419,8 @@ def sys_id(robot, angle, velocity, acceleration, torque):
     log['rmse_batch_before_id'] = rmse_batch(theta=robot.get_params(),
                                              Y=Y, T=T)
 
-    regularization_epsilon = 1e-30
-    regularization_mu = np.matrix(np.zeros(Y.shape[1]) + 1e-6).transpose()
+    regularization_epsilon = 1e-10
+    regularization_mu = robot.get_params()
     theta = np.linalg.solve(
         Y.transpose() * Y + regularization_epsilon * np.eye(Y.shape[1],
                                                             Y.shape[1]),
@@ -451,23 +449,28 @@ def test_sys_id_simumlated_torques():
     robot = Robot()
     test_regressor_matrix(robot)
 
-    angle, velocity, acceleration, torque = load_and_preprocess_data()
-    simulated_torque = [robot.inverse_dynamics(angle=angle[t],
-                                               velocity=velocity[t],
-                                               acceleration=acceleration[t])
-                        for t in xrange(angle.shape[0])]
+    data = load_data()
+    data = compute_accelerations(data)
+    data = preprocess_data(data=data,
+                           desired_n_data_points=10000,
+                           smoothing_sigma=None)
+    data['torque'] = [
+        robot.inverse_dynamics(angle=data['angle'][t],
+                               velocity=data['velocity'][t],
+                               acceleration=data['acceleration'][t])
+        for t in xrange(data['angle'].shape[0])]
 
     sys_id(robot=robot,
-           angle=angle,
-           velocity=velocity,
-           acceleration=acceleration,
-           torque=simulated_torque)
+           angle=data['angle'],
+           velocity=data['velocity'],
+           acceleration=data['acceleration'],
+           torque=data['torque'])
 
     assert (rmse_sequential(robot=robot,
-                            angle=angle,
-                            velocity=velocity,
-                            acceleration=acceleration,
-                            torque=simulated_torque) < 1e-10)
+                            angle=data['angle'],
+                            velocity=data['velocity'],
+                            acceleration=data['acceleration'],
+                            torque=data['torque']) < 1e-10)
 
 
 def test_sys_id_visually():
@@ -478,15 +481,20 @@ def test_sys_id_visually():
     #                initial_angle=[1, 1, 1],
     #                mask=[1, 1, 1])
 
-    angle, velocity, acceleration, torque = load_and_preprocess_data()
+    # robot.simulate(dt=0.001, n_steps=10000)
 
+    data = load_data()
+    data = compute_accelerations(data)
+    data = preprocess_data(data=data,
+                           desired_n_data_points=10000,
+                           smoothing_sigma=None)
     sys_id(robot=robot,
-           angle=angle,
-           velocity=velocity,
-           acceleration=acceleration,
-           torque=torque)
+           angle=data['angle'],
+           velocity=data['velocity'],
+           acceleration=data['acceleration'],
+           torque=data['torque'])
 
-    ipdb.set_trace()
+    # robot.simulate(dt=0.001, n_steps=10000)
 
 
 if __name__ == '__main__':
