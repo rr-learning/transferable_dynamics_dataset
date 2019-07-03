@@ -21,6 +21,10 @@ from scipy.ndimage import gaussian_filter1d
 
 import rospkg
 
+
+import time
+
+
 # dynamics learning stuff
 from DL import DynamicsLearnerInterface
 
@@ -116,26 +120,43 @@ class Robot(RobotWrapper):
     def __init__(self):
         self.load_urdf()
         self.viscous_friction = to_matrix(np.zeros(3)) + 0.01
-        self.static_friction = to_matrix(np.zeros(3))
+        self.static_friction = to_matrix(np.zeros(3)) + 0.0
 
     # dynamics -----------------------------------------------------------------
-    def simulate(self, n_seconds=10):
+    def simulate(self,
+                 initial_angle=None,
+                 initial_velocity=None,
+                 torque=None,
+                 mask=np.ones(3),
+                 n_seconds=100,
+                 dt=0.01):
+
         self.initViewer(loadModel=True)
 
-        # angle = pinocchio.randomConfiguration(robot.model)
-        angle = np.transpose(np.matrix([1.0, -1.35, 3.0]))
-        velocity = pinocchio.utils.zero(self.model.nv)
-        torque = pinocchio.utils.zero(self.model.nv)
+        zero = pinocchio.utils.zero(self.model.nv)
+        angle = to_matrix(initial_angle) if initial_angle else zero
+        velocity = to_matrix(initial_velocity) if initial_velocity else zero
+        torque = to_matrix(torque) if torque else zero
+        mask = to_matrix(mask)
 
-        dt = 0.01
+        last_time = time.time()
         for _ in xrange(int(n_seconds / dt)):
             acceleration = self.forward_dynamics(angle, velocity, torque)
 
-            angle = angle + velocity * dt
-            velocity = velocity + acceleration * dt
+            angle = angle + np.multiply(mask, velocity * dt)
+            velocity = velocity + np.multiply(mask, acceleration * dt)
 
             self.display(angle)
-            time.sleep(dt)
+            print('angle: ', np.array(angle).flatten(),
+                  '\nvelocity: ', np.array(velocity).flatten())
+
+            sleep_time = last_time + dt - time.time()
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+            current_time = time.time()
+            print('time elapsed in cycle', current_time - last_time)
+            last_time = current_time
 
     def show_trajectory(self, angle, dt=0.001):
         self.initViewer(loadModel=True)
@@ -258,18 +279,16 @@ def load_and_preprocess_data(desired_n_data_points=10000):
     data = dict()
     data['angle'] = all_data['measured_angles']
 
-    robot = Robot()
-
-    angle = np.zeros([100, 3])
-    angle[:, 1] = np.linspace(0, math.pi, 100)
-
-    robot.show_trajectory(angle=angle,
-                          dt=0.1)
-
-    robot.show_trajectory(angle=data['angle'][100],
-                          dt=0.001)
-
-
+    # robot = Robot()
+    # #
+    # # angle = np.zeros([100, 3])
+    # # angle[:, 1] = np.linspace(0, math.pi, 100)
+    # #
+    # # robot.show_trajectory(angle=angle,
+    # #                       dt=0.1)
+    #
+    # robot.show_trajectory(angle=data['angle'][100],
+    #                       dt=0.001)
 
     data['velocity'] = all_data['measured_velocities']
     ### TODO: not sure whether to take measured or constrained torques
@@ -399,15 +418,38 @@ def sys_id(robot, angle, velocity, acceleration, torque):
         print(key + ': ', log[key], '\n')
 
 
-def test_sys_id():
+def test_sys_id_simumlated_torques():
     robot = Robot()
     test_regressor_matrix(robot)
 
-    angle, velocity, acceleration, _ = load_and_preprocess_data()
-    torque = [robot.inverse_dynamics(angle=angle[t],
-                                     velocity=velocity[t],
-                                     acceleration=acceleration[t])
-              for t in xrange(angle.shape[0])]
+    angle, velocity, acceleration, torque = load_and_preprocess_data()
+    simulated_torque = [robot.inverse_dynamics(angle=angle[t],
+                                               velocity=velocity[t],
+                                               acceleration=acceleration[t])
+                        for t in xrange(angle.shape[0])]
+
+    sys_id(robot=robot,
+           angle=angle,
+           velocity=velocity,
+           acceleration=acceleration,
+           torque=simulated_torque)
+
+    assert (rmse_sequential(robot=robot,
+                            angle=angle,
+                            velocity=velocity,
+                            acceleration=acceleration,
+                            torque=simulated_torque) < 1e-10)
+
+
+def test_sys_id_visually():
+    robot = Robot()
+    robot.simulate(initial_angle=[1, 1, 1],
+                   torque=[0., 0., 0.],
+                   mask=[1, 1, 1],
+                   n_seconds=100,
+                   dt=0.001)
+
+    angle, velocity, acceleration, torque = load_and_preprocess_data()
 
     sys_id(robot=robot,
            angle=angle,
@@ -415,20 +457,16 @@ def test_sys_id():
            acceleration=acceleration,
            torque=torque)
 
-    assert(rmse_sequential(robot=robot,
-                           angle=angle,
-                           velocity=velocity,
-                           acceleration=acceleration,
-                           torque=torque) < 1e-10)
+    robot.simulate(n_seconds=100)
 
     ipdb.set_trace()
 
 
 if __name__ == '__main__':
     try:
-        test_sys_id()
+        test_sys_id_visually()
+        test_sys_id_simumlated_torques()
 
-        sys_id(robot, *load_and_preprocess_data())
     except:
         traceback.print_exc(sys.stdout)
         _, _, tb = sys.exc_info()
