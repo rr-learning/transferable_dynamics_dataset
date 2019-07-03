@@ -118,7 +118,7 @@ class Robot(RobotWrapper):
     def __init__(self):
         self.load_urdf()
         self.viscous_friction = to_matrix(np.zeros(3)) + 0.01
-        self.static_friction = to_matrix(np.zeros(3)) + 0.0
+        self.static_friction = to_matrix(np.zeros(3)) + 0.00
 
     # dynamics -----------------------------------------------------------------
     def simulate(self,
@@ -131,16 +131,17 @@ class Robot(RobotWrapper):
                  verbose=False):
         zero = pinocchio.utils.zero(self.model.nv)
 
-        torque = np.array(torque) if torque else np.array(zero)
+        torque = np.array(zero) if torque is None else np.array(torque)
         torque = torque.reshape(-1, 3, 1)
         if torque.shape[0] == 1:
-            assert(n_steps)
+            assert (n_steps)
             torque = np.repeat(torque, repeats=n_steps, axis=0)
         elif n_steps:
-            assert(n_steps == torque.shape[0])
+            assert (n_steps == torque.shape[0])
 
-        angle = to_matrix(initial_angle) if initial_angle else zero
-        velocity = to_matrix(initial_velocity) if initial_velocity else zero
+        angle = zero if initial_angle is None else to_matrix(initial_angle)
+        velocity = \
+            zero if initial_velocity is None else to_matrix(initial_velocity)
         mask = to_matrix(mask)
 
         self.initViewer(loadModel=True)
@@ -165,12 +166,20 @@ class Robot(RobotWrapper):
                 print('time elapsed in cycle', current_time - last_time)
             last_time = current_time
 
-    def show_trajectory(self, angle, dt=0.001):
+    def show_trajectory(self, dt, angle):
         self.initViewer(loadModel=True)
 
+        last_time = time.time()
         for t in xrange(angle.shape[0]):
             self.display(to_matrix(angle[t]))
-            time.sleep(dt)
+
+            sleep_time = last_time + dt - time.time()
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+            current_time = time.time()
+            print('time elapsed in cycle', current_time - last_time)
+            last_time = current_time
 
             print(angle[t])
 
@@ -299,14 +308,20 @@ def load_and_preprocess_data(desired_n_data_points=10000):
 
     data['velocity'] = all_data['measured_velocities']
     ### TODO: not sure whether to take measured or constrained torques
-    data['torque'] = all_data['measured_torques']
-
+    data['torque'] = all_data['constrained_torques']
 
     robot = Robot()
-    sample_idx = 23
+    sample_idx = 113
 
-    robot.simulate(torque=data['torque'][sample_idx],
-                   initial_angle=data['angle'][sample_idx,0])
+    robot.show_trajectory(dt=0.001,
+                          angle=data['angle'][sample_idx, :2000])
+
+    robot.simulate(dt=0.001,
+                   torque=data['torque'][sample_idx, :2000],
+                   initial_angle=data['angle'][sample_idx, 0],
+                   initial_velocity=data['velocity'][sample_idx, 0])
+
+
 
     return preprocess_data(data=data,
                            desired_n_data_points=desired_n_data_points,
@@ -470,8 +485,6 @@ def test_sys_id_visually():
            velocity=velocity,
            acceleration=acceleration,
            torque=torque)
-
-    robot.simulate(n_seconds=100)
 
     ipdb.set_trace()
 
