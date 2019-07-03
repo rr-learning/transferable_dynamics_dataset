@@ -4,6 +4,8 @@ Learning a LWPR model.
 
 import argparse
 import numpy as np
+import time
+from collections import deque
 from DL import DynamicsLearnerInterface
 from DL.utils import loadRobotData
 from lwpr import LWPR
@@ -17,13 +19,13 @@ class lwpr_dyn_model(DynamicsLearnerInterface):
         self.model_ = LWPR(self._get_input_dim(), self.observation_dimension)
 
         # Default values.
-        init_D = 20
-        init_alpha = 100
-        self.number_training_points = None
+        init_D = 25
+        init_alpha = 175
+        self.time_threshold = np.inf
         if settings:
             init_D = settings['init_D']
             init_alpha = settings['init_alpha']
-            self.number_training_points = settings.get('n_training', None)
+            self.time_threshold = settings.get('time_threshold', np.inf)
         self.model_.init_D = init_D * np.eye(self._get_input_dim())
         self.model_.init_alpha = init_alpha * np.eye(self._get_input_dim())
 
@@ -37,16 +39,21 @@ class lwpr_dyn_model(DynamicsLearnerInterface):
                 training_inputs.shape[0])
 
     def _learn_from_stream(self, training_generator, generator_size):
-
-        limit = generator_size
-        if self.number_training_points:
-            limit = min(limit, self.number_training_points)
-        for count in range(limit):
+        deck = deque(maxlen=100)
+        for count in range(generator_size):
             training_target, training_input = next(training_generator)
             assert training_input.shape[0] == self._get_input_dim()
             assert training_target.shape[0] == self.observation_dimension
-            #model_input = training_input.reshape(1, -1)
+            time_before_update = time.perf_counter()
             self.model_.update(training_input, training_target)
+            elapsed_time = time.perf_counter() - time_before_update
+            deck.append(elapsed_time)
+            if count and count % 1000 == 0:
+                median_time = sorted(deck)[deck.maxlen // 2]
+                print('Update time for iter {} is {}'.format(count,
+                        median_time))
+                if median_time > self.time_threshold:
+                    break
 
     def _predict(self, inputs):
         assert self.model_, "a trained model must be available"
@@ -62,15 +69,30 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_filename", required=True,
             help="<Required> filename of the input robot data")
+    parser.add_argument("--history_length", type=int, default=1)
+    parser.add_argument("--prediction_horizon", type=int, default=1)
+    parser.add_argument("--averaging", dest='averaging', action='store_true')
+    parser.add_argument("--no-averaging", dest='averaging',
+            action='store_false')
+    parser.set_defaults(averaging=False)
     args = parser.parse_args()
     observations, actions = loadRobotData(args.data_filename)
 
-    # Learning in batch mode.
-    dynamics_model = lwpr_dyn_model(1, 1, True, False, False)
-    dynamics_model.learn(observations, actions)
-    print(dynamics_model.name())
+    settings = {"init_alpha": 175, "init_D": 25, "time_threshold" : 0.01}
 
-    # Learning in mini batch mode.
-    dynamics_model = lwpr_dyn_model(1, 1, True, False, True)
+    # Learning in stremaing mode.
+    dynamics_model = lwpr_dyn_model(args.history_length,
+            args.prediction_horizon, True, args.averaging, streaming=True,
+            settings=settings)
+    init_train_time = time.perf_counter()
     dynamics_model.learn(observations, actions)
-    print(dynamics_model.name())
+    end_train_time = time.perf_counter()
+    print('Training time {}'.format(end_train_time - init_train_time))
+
+    init_pred_time = time.perf_counter()
+    dynamics_model.predict(observations[:, :args.history_length],
+            actions[:, :args.history_length],
+            actions[:, args.history_length: args.history_length + \
+                    args.prediction_horizon - 1])
+    end_pred_time = time.perf_counter()
+    print('Prediction time {}'.format(end_pred_time - init_pred_time))
