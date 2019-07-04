@@ -232,9 +232,6 @@ def run(parser):
                                           settings=settings)
     elif arguments.method == 'system_id':
         from DL.methods.system_id import SystemId
-        assert(arguments.identification_method == 'cad' or
-               arguments.identification_method == 'ls' or
-               arguments.identification_method == 'constrained_ls')
 
         dynamics_learner = SystemId(history_length=arguments.history_length,
                                     prediction_horizon=arguments.prediction_horizon,

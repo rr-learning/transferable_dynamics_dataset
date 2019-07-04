@@ -65,7 +65,7 @@ class SystemId(DynamicsLearnerInterface):
                    velocity=data['velocity'],
                    acceleration=data['acceleration'],
                    torque=data['torque'])
-        elif self.identification_method == 'constrained_ls':
+        elif self.identification_method == 'ls-lmi':
             raise NotImplementedError
         else:
             raise NotImplementedError
