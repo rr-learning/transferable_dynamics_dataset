@@ -69,7 +69,6 @@ class SystemId(DynamicsLearnerInterface):
 
 
     def predict(self, observation_history, action_history, action_future=None):
-        print('predicting')
         # parse arguments ------------------------------------------------------
         n_samples = observation_history.shape[0]
         dim_observation = observation_history.shape[2]
