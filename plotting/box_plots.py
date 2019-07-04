@@ -12,7 +12,7 @@ from collections import defaultdict
 from DL.evaluation.evaluation import get_angle_errors, compute_RMSE_from_errors
 
 
-def plot_errors(error_files, names=None, violinplot=False, setups=[]):
+def plot_errors(error_files, names=None, violinplot=False, setups=[], show=True):
     if names:
         assert len(names) == len(error_files)
     from_setup_to_norms = defaultdict(list)
@@ -52,7 +52,9 @@ def plot_errors(error_files, names=None, violinplot=False, setups=[]):
         # if names:
         #     entries = ["{}={:.8f}".format(x,y) for x,y in zip(names, entries)]
         # ax.legend(patches, entries, loc='lower left', bbox_to_anchor= (0.0, 1.1))
-    plt.show()
+
+    if show:
+        plt.show()
     return fig
 
 
