@@ -23,6 +23,8 @@ import rospkg
 
 import time
 
+import cvxpy
+
 # dynamics learning stuff
 from DL import DynamicsLearnerInterface
 
@@ -421,6 +423,65 @@ def rmse_batch(theta, Y, T):
     return np.squeeze(np.sqrt(
         (Y * theta - T).transpose().dot(Y * theta - T) / len(T)))
 
+
+def sys_id_lmi(robot, angle, velocity, acceleration, torque):
+    log = dict()
+
+    test_regressor_matrix(robot)
+
+    Y = np.concatenate(
+        [robot.compute_regressor_matrix(angle[t], velocity[t], acceleration[t])
+         for t in
+         xrange(angle.shape[0])], axis=0)
+
+    T = np.concatenate(
+        [to_matrix(torque[t]) for t in xrange(angle.shape[0])], axis=0)
+
+    log['rmse_sequential_before_id'] = rmse_sequential(robot=robot,
+                                                       angle=angle,
+                                                       velocity=velocity,
+                                                       acceleration=acceleration,
+                                                       torque=torque)
+    log['rmse_batch_before_id'] = rmse_batch(theta=robot.get_params(),
+                                             Y=Y, T=T)
+
+
+    #Constrained optimization using CVXPY
+    #theta = [m, mc_x, mc_y, mc_z, I_xx, I_xy, I_yy, I_xz, I_yz, I_zz]
+    theta = cvxpy.Variable((36, 1))
+
+    cost = Y*theta - T
+    cost = cvxpy.norm(cost)
+
+    J = [] #constraints
+
+    for i in range(3):
+        J += [(cvxpy.bmat([[0.5*(-theta[i*10+4]+theta[i*10+6]+theta[i*10+9]), -theta[i*10+5], -theta[i*10+7], theta[i*10+1]],
+                            [-theta[i*10+5], 0.5*(theta[i*10+4]-theta[i*10+6]+theta[i*10+9]), -theta[i*10+8], theta[i*10+2]],
+                            [-theta[i*10+7], -theta[i*10+8], 0.5*(theta[i*10+4]+theta[i*10+6]-theta[i*10+9]), theta[i*10+3]],
+                            [theta[i*10+1], theta[i*10+2], theta[i*10+3], theta[i*10]]]) >> 0)]
+
+    prob = cvxpy.Problem(cvxpy.Minimize(cost), J)
+    prob.solve(verbose=False,eps=10e-6,max_iters=10000,solver='SCS')
+
+    theta = theta.value
+
+    log['rmse_batch_optimal_theta_after_id_lmi'] = rmse_batch(theta=theta,
+                                                          Y=Y, T=T)
+
+    robot.set_params(theta)
+
+    test_regressor_matrix(robot)
+
+    log['rmse_sequential_after_id_lmi'] = rmse_sequential(robot=robot,
+                                                      angle=angle,
+                                                      velocity=velocity,
+                                                      acceleration=acceleration,
+                                                      torque=torque)
+    log['rmse_batch_after_id_lmi'] = rmse_batch(theta=robot.get_params(), Y=Y, T=T)
+
+    for key in log.keys():
+        print(key + ': ', log[key], '\n')
 
 def sys_id(robot, angle, velocity, acceleration, torque):
     log = dict()
