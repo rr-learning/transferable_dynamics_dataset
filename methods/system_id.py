@@ -23,7 +23,8 @@ import rospkg
 
 import time
 
-import cvxpy
+if sys.version_info[0] >= 3:
+    import cvxpy
 
 # dynamics learning stuff
 from DL import DynamicsLearnerInterface
