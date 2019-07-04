@@ -125,6 +125,9 @@ def run(parser):
     parser.add_argument("--no-streaming", dest='streaming',
                         action='store_false')
     parser.add_argument("--verbose", action='store_true')
+
+    parser.add_argument("--identify_parameters")
+
     parser.set_defaults(averaging=False)
     parser.set_defaults(streaming=False)
     arguments = parser.parse_args()
@@ -229,9 +232,13 @@ def run(parser):
                                           settings=settings)
     elif arguments.method == 'system_id':
         from DL.methods.system_id import SystemId
+        assert(arguments.identify_parameters == 'False' or
+               arguments.identify_parameters == 'True')
+        arguments.identify_parameters = bool(arguments.identify_parameters == 'True')
+
         dynamics_learner = SystemId(history_length=arguments.history_length,
                                     prediction_horizon=arguments.prediction_horizon,
-                                    averaging=arguments.averaging)
+                                    identify_parameters=arguments.identify_parameters)
 
     assert dynamics_learner, "Make sure the method is implemented."
     training_observations, training_actions = loadRobotData(
