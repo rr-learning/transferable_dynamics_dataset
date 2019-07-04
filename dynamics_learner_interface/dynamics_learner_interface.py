@@ -2,14 +2,14 @@ import numpy as np
 import sys
 from collections import defaultdict
 from DL.utils import unrollTrainingData, concatenateActionsStates, \
-        Standardizer, concatenateActionsStatesAverages, \
-        unrollTrainingDataStream, computeNumberOfTrainingPairs
+    Standardizer, concatenateActionsStatesAverages, \
+    unrollTrainingDataStream, computeNumberOfTrainingPairs
 
 
 class DynamicsLearnerInterface(object):
 
     def __init__(self, history_length, prediction_horizon,
-            difference_learning=True, averaging=False, streaming=False):
+                 difference_learning=True, averaging=False, streaming=False):
         self.history_length = history_length
         self.prediction_horizon = prediction_horizon
         self.observation_dimension = 9
@@ -26,21 +26,23 @@ class DynamicsLearnerInterface(object):
 
         if self.streaming:
             training_data_stream = unrollTrainingDataStream(
-                    observation_sequences, action_sequences,
-                    self.history_length, self.prediction_horizon,
-                    self.difference_learning, average=self.averaging,
-                    infinite=True)
+                observation_sequences, action_sequences,
+                self.history_length, self.prediction_horizon,
+                self.difference_learning, average=self.averaging,
+                infinite=True)
             ntraining_pairs = computeNumberOfTrainingPairs(
-                    observation_sequences, self.history_length,
-                    self.prediction_horizon)
+                observation_sequences, self.history_length,
+                self.prediction_horizon)
             normalized_data_stream = self._standardize_data_stream(
-                    training_data_stream)
+                training_data_stream)
             self._learn_from_stream(normalized_data_stream, ntraining_pairs)
         else:
             targets, inputs = unrollTrainingData(observation_sequences,
-                    action_sequences, self.history_length,
-                    self.prediction_horizon, self.difference_learning,
-                    self.averaging)
+                                                 action_sequences,
+                                                 self.history_length,
+                                                 self.prediction_horizon,
+                                                 self.difference_learning,
+                                                 self.averaging)
 
             # Whitening the inputs.
             std_targets = self.targets_standardizer.standardize(targets)
@@ -50,7 +52,7 @@ class DynamicsLearnerInterface(object):
     def _standardize_data_stream(self, data_stream):
         for training_target, training_input in data_stream:
             yield (self.targets_standardizer.standardize(training_target),
-                    self.inputs_standardizer.standardize(training_input))
+                   self.inputs_standardizer.standardize(training_input))
 
     def _training_inputs_data_stream(self, data_stream):
         for _, training_input in data_stream:
@@ -61,22 +63,26 @@ class DynamicsLearnerInterface(object):
             yield training_target
 
     # do not override this function!
-    def _preprocess_and_predict(self, observation_history, action_history, action_future=None):
+    def _preprocess_and_predict(self, observation_history, action_history,
+                                action_future=None):
         if action_future is None:
             assert self.prediction_horizon == 1
             action_future = np.empty((observation_history.shape[0],
                                       0,
                                       self.action_dimension))
 
-        self._check_prediction_inputs(observation_history, action_history, action_future)
+        self._check_prediction_inputs(observation_history, action_history,
+                                      action_future)
 
         # Making a single input from all the input parameters.
         if self.averaging:
             dynamics_inputs = concatenateActionsStatesAverages(action_history,
-                    observation_history, action_future)
+                                                               observation_history,
+                                                               action_future)
         else:
             dynamics_inputs = concatenateActionsStates(action_history,
-                    observation_history, action_future)
+                                                       observation_history,
+                                                       action_future)
 
         # Whitening the input.
         whitened_input = self.inputs_standardizer.standardize(dynamics_inputs)
@@ -85,13 +91,13 @@ class DynamicsLearnerInterface(object):
 
         # Dewhitening the output
         dewhitened_predictions = self.targets_standardizer.unstandardize(
-                whitened_predictions)
+            whitened_predictions)
 
         if self.difference_learning:
             dewhitened_predictions += observation_history[:, -1, :]
 
         self._check_prediction_outputs(observation_history,
-                dewhitened_predictions)
+                                       dewhitened_predictions)
         return dewhitened_predictions
 
     # do not override this function!
@@ -102,29 +108,66 @@ class DynamicsLearnerInterface(object):
                                       0,
                                       self.action_dimension))
 
-        if self.prediction_horizon == action_future.shape[1] + 1:
-            return self._preprocess_and_predict(observation_history, action_history, action_future)
+        assert self.prediction_horizon == action_future.shape[1] + 1
 
-        assert self.prediction_horizon == 1
+        return self._preprocess_and_predict(observation_history,
+                                            action_history, action_future)
 
-        observation_history_t = observation_history
-        action_history_t = action_history
-        predicted_observation = self._preprocess_and_predict(observation_history_t, action_history_t)
+        # assert self.prediction_horizon == 1
+        #
+        # observation_history_t = observation_history
+        # action_history_t = action_history
+        # predicted_observation = self._preprocess_and_predict(
+        #     observation_history_t, action_history_t)
+        #
+        # for t in range(action_future.shape[1]):
+        #     predicted_observation = np.expand_dims(predicted_observation,
+        #                                            axis=1)
+        #     observation_history_t = np.append(observation_history_t[:, 1:],
+        #                                       predicted_observation, axis=1)
+        #     action_history_t = np.append(action_history_t[:, 1:],
+        #                                  action_future[:, t:t + 1], axis=1)
+        #     predicted_observation = self._preprocess_and_predict(
+        #         observation_history_t, action_history_t)
+        #
+        #     assert (action_history_t[:, :-(t + 1)] == action_history[:,
+        #                                               t + 1:]).all()
+        #     assert (observation_history_t[:, :-(t + 1)] == observation_history[
+        #                                                    :, t + 1:]).all()
+        #     assert (action_history_t[:, -1] == action_future[:, t]).all()
+        #
+        # return predicted_observation
 
-        for t in range(action_future.shape[1]):
-            predicted_observation = np.expand_dims(predicted_observation, axis=1)
-            observation_history_t = np.append(observation_history_t[:, 1:],
-                    predicted_observation, axis=1)
-            action_history_t = np.append(action_history_t[:, 1:],
-                    action_future[:, t:t + 1], axis=1)
-            predicted_observation = self._preprocess_and_predict(
-                    observation_history_t, action_history_t)
+    def predict_recursively(self,
+                            observation_history,
+                            action_history,
+                            action_future):
+        # parse arguments ------------------------------------------------------
+        assert (self.history_length == 1)
+        n_time_steps = action_future.shape[1] + 1
+        assert (n_time_steps % self.prediction_horizon == 0)
+        n_prediction_steps = n_time_steps / self.prediction_horizon
 
-            assert (action_history_t[:, :-(t + 1)] == action_history[:, t + 1:]).all()
-            assert (observation_history_t[:, :-(t + 1)] == observation_history[:, t + 1:]).all()
-            assert (action_history_t[:, -1] == action_future[:, t]).all()
+        observation = observation_history
+        action_sequence = np.concatenate([action_history,
+                                          action_future], axis=1)
 
-        return predicted_observation
+        observations = np.empty([observation.shape[0],
+                                 n_prediction_steps,
+                                 observation.shape[2]])
+        observation[:] = np.nan
+
+        for prediction_step in range(n_prediction_steps):
+            t = prediction_step * self.prediction_horizon
+            macro_action = action_sequence[:, t: t + self.prediction_horizon]
+
+            observation = self.predict(observation,
+                                       macro_action[:, 0:1],
+                                       macro_action[:, 1:])
+
+            observations[:, prediction_step] = observation
+
+        return observations
 
     # Do not override this function.
     def _get_input_dim(self):
@@ -134,8 +177,9 @@ class DynamicsLearnerInterface(object):
                 ret += self.action_dimension
             return ret
         return self.history_length * (self.observation_dimension +
-                self.action_dimension ) + (self.prediction_horizon
-                - 1) * self.action_dimension
+                                      self.action_dimension) + (
+                       self.prediction_horizon
+                       - 1) * self.action_dimension
 
     # override this function
     def name(self):
@@ -196,7 +240,8 @@ class DynamicsLearnerInterface(object):
         assert observation_sequences.shape[2] == self.observation_dimension
         assert action_sequences.shape[2] == self.action_dimension
 
-    def _check_prediction_inputs(self, observation_history, action_history, action_future):
+    def _check_prediction_inputs(self, observation_history, action_history,
+                                 action_future):
         n_samples = observation_history.shape[0]
 
         assert observation_history.shape == (n_samples,
@@ -211,7 +256,8 @@ class DynamicsLearnerInterface(object):
                                        self.prediction_horizon - 1,
                                        self.action_dimension)
 
-    def _check_prediction_outputs(self, observation_history, observation_prediction):
+    def _check_prediction_outputs(self, observation_history,
+                                  observation_prediction):
         n_samples = observation_history.shape[0]
 
         assert observation_prediction.shape == (n_samples,
@@ -224,18 +270,20 @@ class DynamicsLearnerInterface(object):
         self._check_learning_inputs(observation_sequences, action_sequences)
         if not self.streaming:
             targets, inputs = unrollTrainingData(observation_sequences,
-                    action_sequences, self.history_length,
-                    self.prediction_horizon, self.difference_learning,
-                    self.averaging)
+                                                 action_sequences,
+                                                 self.history_length,
+                                                 self.prediction_horizon,
+                                                 self.difference_learning,
+                                                 self.averaging)
         else:
             targets = self._training_targets_data_stream(
-                    unrollTrainingDataStream(
+                unrollTrainingDataStream(
                     observation_sequences, action_sequences,
                     self.history_length, self.prediction_horizon,
                     self.difference_learning, average=self.averaging,
                     infinite=False))
             inputs = self._training_inputs_data_stream(
-                    unrollTrainingDataStream(
+                unrollTrainingDataStream(
                     observation_sequences, action_sequences,
                     self.history_length, self.prediction_horizon,
                     self.difference_learning, average=self.averaging,
@@ -281,23 +329,25 @@ if __name__ == '__main__':
     history_length = 10
     prediction_horizon = 100
     dynamics_learner = DynamicsLearnerExample(history_length,
-            prediction_horizon, streaming=True)
+                                              prediction_horizon,
+                                              streaming=True)
     dynamics_learner.learn(observation_sequences, action_sequences)
 
     hist_obs = observation_sequences[:, :history_length].copy()
     hist_act = action_sequences[:, :history_length].copy()
     fut_act = action_sequences[:, history_length:history_length +
-            prediction_horizon - 1].copy()
+                                                 prediction_horizon - 1].copy()
     observation_prediction = dynamics_learner.predict(hist_obs, hist_act,
-            fut_act)
-    rms = np.linalg.norm(observation_sequences[:, history_length + prediction_horizon - 1] -
-                         observation_prediction)
+                                                      fut_act)
+    rms = np.linalg.norm(
+        observation_sequences[:, history_length + prediction_horizon - 1] -
+        observation_prediction)
 
     # Asserting that the inputs to the predict method were left unchanged.
     assert np.array_equal(hist_obs,
-            observation_sequences[:, :history_length])
+                          observation_sequences[:, :history_length])
     assert np.array_equal(hist_act,
-            action_sequences[:, :history_length])
+                          action_sequences[:, :history_length])
     assert np.array_equal(fut_act, action_sequences[:,
-            history_length:history_length + prediction_horizon - 1])
+                                   history_length:history_length + prediction_horizon - 1])
     print('rms: ', rms)
