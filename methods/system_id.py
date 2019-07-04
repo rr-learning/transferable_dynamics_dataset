@@ -42,6 +42,7 @@ class SystemId(DynamicsLearnerInterface):
         self.identification_method = identification_method
 
     def learn(self, observation_sequences, action_sequences):
+        print('learning')
         # preprocess data ------------------------------------------------------
         data = dict()
         data['angle'] = observation_sequences[:, :, :3]
@@ -68,7 +69,7 @@ class SystemId(DynamicsLearnerInterface):
 
 
     def predict(self, observation_history, action_history, action_future=None):
-
+        print('predicting')
         # parse arguments ------------------------------------------------------
         n_samples = observation_history.shape[0]
         dim_observation = observation_history.shape[2]
