@@ -8,6 +8,7 @@ import numpy as np
 import time
 
 import sys
+import ipdb
 
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerExample
 from DL.utils import Standardizer
@@ -75,6 +76,17 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
     errors_to_return = list(output_errors.values())
     assert len(errors_to_return) == 1
     return errors_to_return[0]
+
+def get_evaluation_errors(all_errors):
+    angle_errors = all_errors[:,:, :3]
+    norms = np.linalg.norm(angle_errors, axis=-1, ord=1)
+    norms = np.sum(norms, axis=1)
+
+    norms = norms / angle_errors.size * norms.size
+
+    return norms.flatten()
+
+
 
 def get_angle_errors(errors):
     """

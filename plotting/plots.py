@@ -10,52 +10,50 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from collections import defaultdict
-from DL.evaluation.evaluation import get_angle_errors, compute_RMSE_from_errors
+from DL.evaluation.evaluation import get_angle_errors, \
+    compute_RMSE_from_errors, get_evaluation_errors
 
 
-def box_violin_plot(error_files, names=None, violinplot=False, setups=[], show=True):
-    if names:
-        assert len(names) == len(error_files)
-    from_setup_to_norms = defaultdict(list)
-    from_setup_to_RMSEs = defaultdict(list)
-    for error in error_files:
-        errors_dict = np.load(error)
-        for setup, errors in errors_dict.items():
-            np_errors = get_angle_errors(errors)
-            nseq, length, dim = np_errors.shape
-            joint_errors = np_errors.reshape((-1, dim))
-            assert np.array_equal(joint_errors[0], np_errors[0,0])
-            norms = np.linalg.norm(joint_errors, axis=1)
-            from_setup_to_norms[setup].append(norms)
-            from_setup_to_RMSEs[setup].append(compute_RMSE_from_errors(
-                np_errors))
-    if len(setups) == 0:
-        setups = from_setup_to_norms.keys()
-    fig, axs = plt.subplots(1, len(from_setup_to_norms.keys()), sharey=True, figsize=(20,4))
-    for i, setup in enumerate(setups):
-        norms_array = from_setup_to_norms[setup]
+def box_violin_plot(error_files,
+                    method_names=None,
+                    violinplot=False,
+                    dataset_names=[]):
+    if method_names:
+        assert len(method_names) == len(error_files)
+    evaluation_errors = defaultdict(list)
+    for error_file in error_files:
+        errors_dict = np.load(error_file)
+        for dataset_name, errors in errors_dict.items():
+            evaluation_errors[dataset_name].append(
+                get_evaluation_errors(errors))
+
+    if len(dataset_names) == 0:
+        dataset_names = evaluation_errors.keys()
+    fig, axs = plt.subplots(1, len(evaluation_errors.keys()), sharey=True, figsize=(20,4))
+    for i, dataset_name in enumerate(dataset_names):
         ax = axs[i]
-        ax.set_title(setup)
+        ax.set_title(dataset_name)
         ax.set_yscale("log")
+        # ax.set_ylim(0,0.25)
         if violinplot:
-            ret = ax.violinplot(norms_array, showmeans=True, showmedians=True,
+            ret = ax.violinplot(evaluation_errors[dataset_name],
+                                showmeans=True, showmedians=True,
                     showextrema=True)
             ret['cmeans'].set_color('r')
             ret['cmedians'].set_color('b')
         else:
-            ret = ax.boxplot(norms_array, showmeans=True)
-        if names:
+            ret = ax.boxplot(evaluation_errors[dataset_name],
+                             showmeans=True)
+        if method_names:
             ax.set_xticks([y+1 for y in range(len(error_files))])
-            ax.set_xticklabels(names, rotation=45, fontsize=8)
+            ax.set_xticklabels(method_names, rotation=45, fontsize=8)
         # red_patch = mpatches.Patch(color='black')
         # patches = [red_patch] * len(error_files)
-        # entries = from_setup_to_RMSEs[setup]
+        # entries = from_setup_to_RMSEs[dataset_name]
         # if names:
         #     entries = ["{}={:.8f}".format(x,y) for x,y in zip(names, entries)]
         # ax.legend(patches, entries, loc='lower left', bbox_to_anchor= (0.0, 1.1))
 
-    if show:
-        plt.show()
     return fig
 
 def aggregated_plot(RMSEs,
