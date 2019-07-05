@@ -146,7 +146,7 @@ class DynamicsLearnerInterface(object):
         assert (self.history_length == 1)
         n_time_steps = action_future.shape[1] + 1
         assert (n_time_steps % self.prediction_horizon == 0)
-        n_prediction_steps = n_time_steps / self.prediction_horizon
+        n_prediction_steps = int(n_time_steps / self.prediction_horizon)
 
         observation = observation_history
         action_sequence = np.concatenate([action_history,
@@ -155,7 +155,7 @@ class DynamicsLearnerInterface(object):
         observations = np.empty([observation.shape[0],
                                  n_prediction_steps,
                                  observation.shape[2]])
-        observation[:] = np.nan
+        observations[:] = np.nan
 
         for prediction_step in range(n_prediction_steps):
             t = prediction_step * self.prediction_horizon
@@ -163,7 +163,7 @@ class DynamicsLearnerInterface(object):
 
             observation = self.predict(observation,
                                        macro_action[:, 0:1],
-                                       macro_action[:, 1:])
+                                       macro_action[:, 1:])[:, np.newaxis,:]
 
             observations[:, prediction_step] = observation
 

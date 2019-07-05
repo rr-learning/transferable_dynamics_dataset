@@ -14,7 +14,7 @@ class LinearModelSGD(DynamicsLearnerInterface):
             averaging, streaming, settings=None):
         super().__init__(history_length, prediction_horizon,
                 difference_learning, averaging=averaging, streaming=streaming)
-        eta0 = 0.00001
+        eta0 = 0.0001
         epochs = 1
         if settings:
             eta0 = settings['eta0']
