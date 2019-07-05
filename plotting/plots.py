@@ -1,7 +1,7 @@
 """
 Box plotting of multiple error files.
 """
-
+import ipdb
 import argparse
 import itertools
 import os
@@ -15,44 +15,50 @@ from DL.evaluation.evaluation import get_angle_errors, \
 
 
 def box_violin_plot(error_files,
-                    method_names=None,
-                    violinplot=False,
-                    dataset_names=[]):
-    if method_names:
-        assert len(method_names) == len(error_files)
-    evaluation_errors = defaultdict(list)
-    for error_file in error_files:
-        errors_dict = np.load(error_file)
-        for dataset_name, errors in errors_dict.items():
-            evaluation_errors[dataset_name].append(
-                get_evaluation_errors(errors))
+                    method_names,
+                    violinplot,
+                    dataset_names):
 
-    if len(dataset_names) == 0:
-        dataset_names = evaluation_errors.keys()
-    fig, axs = plt.subplots(1, len(evaluation_errors.keys()), sharey=True, figsize=(20,4))
+    evaluation_errors = {}
+    for method_name, error_file in zip(method_names, error_files):
+        errors_dict = np.load(error_file)
+        evaluation_errors[method_name] = {}
+        for dataset_name, errors in errors_dict.items():
+            evaluation_errors[method_name][dataset_name] = \
+                get_evaluation_errors(errors)
+
+    # normalize and remove delta 0 from plot -----------------------------------
+    for dataset_name in evaluation_errors['delta 0'].keys():
+        normalizer = np.mean(evaluation_errors['delta 0'][dataset_name])
+        for method_name in evaluation_errors.keys():
+            evaluation_errors[method_name][dataset_name] /= normalizer
+    method_names.remove('delta 0')
+
+
+
+    fig, axs = plt.subplots(1, len(dataset_names),
+                            sharey=True, figsize=(20,4))
+
     for i, dataset_name in enumerate(dataset_names):
         ax = axs[i]
         ax.set_title(dataset_name)
-        ax.set_yscale("log")
-        # ax.set_ylim(0,0.25)
+        #ax.set_yscale("log")
+        # ax.set_ylim(0,0.5)
+        evaluation_errors_dataset = \
+            [evaluation_errors[method_name][dataset_name]
+             for method_name in method_names]
         if violinplot:
-            ret = ax.violinplot(evaluation_errors[dataset_name],
+            ret = ax.violinplot(evaluation_errors_dataset,
                                 showmeans=True, showmedians=True,
                     showextrema=True)
             ret['cmeans'].set_color('r')
             ret['cmedians'].set_color('b')
         else:
-            ret = ax.boxplot(evaluation_errors[dataset_name],
+            ret = ax.boxplot(evaluation_errors_dataset,
                              showmeans=True)
-        if method_names:
-            ax.set_xticks([y+1 for y in range(len(error_files))])
-            ax.set_xticklabels(method_names, rotation=45, fontsize=8)
-        # red_patch = mpatches.Patch(color='black')
-        # patches = [red_patch] * len(error_files)
-        # entries = from_setup_to_RMSEs[dataset_name]
-        # if names:
-        #     entries = ["{}={:.8f}".format(x,y) for x,y in zip(names, entries)]
-        # ax.legend(patches, entries, loc='lower left', bbox_to_anchor= (0.0, 1.1))
+
+        ax.set_xticks([y+1 for y in range(len(error_files))])
+        ax.set_xticklabels(method_names, rotation=45, fontsize=8)
 
     return fig
 
