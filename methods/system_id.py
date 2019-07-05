@@ -66,7 +66,11 @@ class SystemId(DynamicsLearnerInterface):
                    acceleration=data['acceleration'],
                    torque=data['torque'])
         elif self.identification_method == 'ls-lmi':
-            raise NotImplementedError
+            sys_id_lmi(robot=self.robot,
+                   angle=data['angle'],
+                   velocity=data['velocity'],
+                   acceleration=data['acceleration'],
+                   torque=data['torque'])
         else:
             raise NotImplementedError
 
@@ -450,9 +454,10 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
     #Constrained optimization using CVXPY
     #theta = [m, mc_x, mc_y, mc_z, I_xx, I_xy, I_yy, I_xz, I_yz, I_zz]
     theta = cvxpy.Variable((36, 1))
-
-    cost = Y*theta - T
-    cost = cvxpy.norm(cost)
+    
+    prior = robot.get_params().A
+    theta = cvxpy.Variable((36, 1))
+    cost = cvxpy.sum_squares(Y*theta - T) + 1e-6*cvxpy.sum_squares(theta-prior)
 
     J = []
     constraints = []
