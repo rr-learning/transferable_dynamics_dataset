@@ -137,7 +137,11 @@ class NNDynamicsLearner(DynamicsLearnerInterface):
 
 
     def load(self, model_filename):
-        self.model = load_model(model_filename)
+        def position_loss(y_true, y_pred):
+            return tf.losses.mean_squared_error(y_true[:, :3], y_pred[:, :3])
+        custom_objects={'position_loss': position_loss}
+        self.model = load_model(model_filename, custom_objects=custom_objects)
+
 
 
 def optimizer_from_string(opt_str):
