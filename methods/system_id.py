@@ -467,39 +467,18 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
                             [theta[i*10+1], theta[i*10+2], theta[i*10+3], theta[i*10]]])]
         constraints += [J[i] >> 0]
 
-    # mass
-    constraints += [theta[0] >= 0.1]
-    constraints += [theta[0] <= 1]
-    constraints += [theta[10] >= 0.1]
-    constraints += [theta[10] <= 1]
-    constraints += [theta[20] >= 0.03]
-    constraints += [theta[20] <= 1]
-    # friction coeffs
-    constraints += [theta[30] >= 0]
-    constraints += [theta[31] >= 0]
-    constraints += [theta[32] >= 0]
-    constraints += [theta[33] >= 0]
-    constraints += [theta[34] >= 0]
-    constraints += [theta[35] >= 0]
-    # COM*mass, assumes an upper bound of 1kg on the link mass
-    constraints += [theta[1] <= 0.2]
-    constraints += [theta[1] >= -0.2]
-    constraints += [theta[2] <= 0.2]
-    constraints += [theta[2] >= -0.2]
-    constraints += [theta[3] <= 0.2]
-    constraints += [theta[3] >= -0.2]
-    constraints += [theta[11] <= 0.2]
-    constraints += [theta[11] >= -0.2]
-    constraints += [theta[12] <= 0.2]
-    constraints += [theta[12] >= -0.2]
-    constraints += [theta[13] <= 0.2]
-    constraints += [theta[13] >= -0.2]
-    constraints += [theta[21] <= 0.2]
-    constraints += [theta[21] >= -0.2]
-    constraints += [theta[22] <= 0.2]
-    constraints += [theta[22] >= -0.2]
-    constraints += [theta[23] <= 0.2]
-    constraints += [theta[23] >= -0.2]
+    mass_indices = [0, 10, 20]
+    for i in mass_indices:
+        constraints += [theta[i] <=1] + [theta[0] >= 0]
+
+    friction_indices = [30, 31, 32, 33, 34, 35]
+    for i in friction_indices:
+        constraints += [theta[i] >= 0 ]
+
+    com_indices = [1, 2, 3, 11, 12, 13, 21, 22, 23]
+    for i in com_indices:
+        constraints += [theta[com_indices] <= 0.2] + [theta[com_indices] >= -0.2]
+
 
     prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
     prob.solve(verbose=False,eps=10e-6, max_iters=10000,solver='SCS')
