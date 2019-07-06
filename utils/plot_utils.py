@@ -98,7 +98,7 @@ def path_to_error_file(method_name,
     elif bool(re.compile("NN_layers_[0-9]_width_[0-9]+_lr_0.0001_reg_0.0001").match(method_name)):
         method_name = "NN_layers__3_width__64_lr_0.0001_reg_0.0001"
         pattern2 = re.compile("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?")
-        (num_layers, num_units, lr, reg) = [float(str) for str in pattern2.findall(method_name)]
+        (num_layers, num_units, lr, reg) = [float(name) for name in pattern2.findall(method_name)]
         return get_path_to_run(num_layers, num_units, lr, reg)
     else:
         assert (False)
