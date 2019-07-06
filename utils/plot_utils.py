@@ -14,8 +14,7 @@ def get_number_of_parameters(l, w, prediction_horizon=100, history_length=1):
     return input*w + w*w*(l-1) + w*output + l*w + output
 
 
-def get_path_to_run(num_layers, num_units, lr, reg,  path_to_ho="/is/cluster/azadaianchuk/hyperparameter_optimization/dynamics_learning/NN/split_5/prediction_horizon_100_history_length_1_epochs_40/"):
-    # path_to_ho="/is/cluster/azadaianchuk/hyperparameter_optimization/dynamics_learning/NN/split_5/prediction_horizon_100_history_length_1_epochs_40/"
+def get_path_to_run(num_layers, num_units, lr, reg,  path_to_ho="/agbs/dynlearning/Errors from HO/prediction_horizon_100_history_length_1_epochs_40/"):
     jobs_info = pd.read_csv(os.path.join(path_to_ho, "job_info.csv"))
     jobs_info["model_train_params"]
     run_id = None
@@ -106,7 +105,7 @@ def path_to_error_file(method_name,
     elif bool(re.compile("NN_lr_0.0001_reg_0.0001_l_[0-9]_w_[0-9]+").match(method_name)):
         pattern2 = re.compile("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?")
         (lr, reg, num_layers, num_units) = [float(name) for name in pattern2.findall(method_name)]
-        ho_path = "/is/cluster/azadaianchuk/hyperparameter_optimization/dynamics_learning/NN/split_5/prediction_horizon_{0}_history_length_{1}_epochs_40/".format(prediction_horizon, history_length)
+        ho_path = "/agbs/dynlearning/Errors from HO/prediction_horizon_{0}_history_length_{1}_epochs_40/".format(prediction_horizon, history_length)
         return get_path_to_run(num_layers, num_units, lr, reg, path_to_ho=ho_path)
     else:
         assert (False)
