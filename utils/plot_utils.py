@@ -6,6 +6,14 @@ from DL.evaluation.evaluation import get_angle_errors, compute_RMSE_from_errors
 import re
 
 
+def get_number_of_parameters(l, w, prediction_horizon=100, history_length=1):
+    action_dimension = 3
+    observation_dimension = 9
+    input = history_length * (observation_dimension + action_dimension) + (prediction_horizon - 1) * action_dimension
+    output = observation_dimension
+    return input*w + w*w*(l-1) + w*output + l*w + output
+
+
 def get_path_to_run(num_layers, num_units, lr, reg,  path_to_ho="/is/cluster/azadaianchuk/hyperparameter_optimization/dynamics_learning/NN/split_5/prediction_horizon_100_history_length_1_epochs_40/"):
     # path_to_ho="/is/cluster/azadaianchuk/hyperparameter_optimization/dynamics_learning/NN/split_5/prediction_horizon_100_history_length_1_epochs_40/"
     jobs_info = pd.read_csv(os.path.join(path_to_ho, "job_info.csv"))
@@ -95,11 +103,11 @@ def path_to_error_file(method_name,
                           '__history_' + str(history_length).zfill(2) + \
                           '__identification_method_' + identification_method + \
                           '.npz'
-    elif bool(re.compile("NN_layers_[0-9]_width_[0-9]+_lr_0.0001_reg_0.0001").match(method_name)):
-        method_name = "NN_layers__3_width__64_lr_0.0001_reg_0.0001"
+    elif bool(re.compile("NN_lr_0.0001_reg_0.0001_l_[0-9]_w_[0-9]+").match(method_name)):
         pattern2 = re.compile("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?")
-        (num_layers, num_units, lr, reg) = [float(name) for name in pattern2.findall(method_name)]
-        return get_path_to_run(num_layers, num_units, lr, reg)
+        (lr, reg, num_layers, num_units) = [float(name) for name in pattern2.findall(method_name)]
+        ho_path = "/is/cluster/azadaianchuk/hyperparameter_optimization/dynamics_learning/NN/split_5/prediction_horizon_{0}_history_length_{1}_epochs_40/".format(prediction_horizon, history_length)
+        return get_path_to_run(num_layers, num_units, lr, reg, path_to_ho=ho_path)
     else:
         assert (False)
 
