@@ -324,7 +324,7 @@ def load_data():
     data['angle'] = all_data['measured_angles']
     data['velocity'] = all_data['measured_velocities']
     ### TODO: not sure whether to take measured or constrained torques
-    data['torque'] = all_data['constrained_torques']
+    data['torque'] = all_data['measured_torques']
 
     # robot = Robot()
     # sample_idx = 113
@@ -349,6 +349,7 @@ def compute_accelerations(data):
 
 def preprocess_data(data, desired_n_data_points,
                     smoothing_sigma=None, shuffle_data=True):
+
     # smoothen -----------------------------------------------------------------
     if smoothing_sigma is not None:
         for key in data.keys():
@@ -361,13 +362,7 @@ def preprocess_data(data, desired_n_data_points,
         data[key] = data[key][:,
                     data[key].shape[1] / 10: -data[key].shape[1] / 10]
 
-    # plot ---------------------------------------------------------------------
-    # dim = 2
-    # sample = 100
-    # for key in ['torque']:
-    #     plt.plot(data[key][sample, :, dim])
-    #     plt.plot(data['smooth_' + key][sample, :, dim])
-    # plt.show()
+
 
     # reshape ------------------------------------------------------------------
     ordered_data = data.copy()
@@ -578,6 +573,8 @@ def test_sys_id_simumlated_torques():
     # create dataset with simulated torques ------------------------------------
     data = load_data()
     data = compute_accelerations(data)
+
+
     for key in data.keys():
         data[key] = data[key][:, 10000: 10200]
 
@@ -620,9 +617,41 @@ def test_sys_id_visually():
 
     data = load_data()
     data = compute_accelerations(data)
+
+
+    # # plot ---------------------------------------------------------------------
+    # for key in data.keys():
+    #     data[key] = gaussian_filter1d(data[key],
+    #                                   sigma=3,
+    #                                   axis=1)
+    #
+    #
+    # dim = 2
+    # sample = 50
+    # data['velocity'] /= 20
+    # stuff = ['torque', 'acceleration', 'velocity']
+    # for key in stuff:
+    #     plt.plot(data[key][sample, 1000:2000, dim])
+    #
+    # plt.legend(stuff)
+    #
+    # # plt.ylim([-10, 10])
+    #
+    # plt.show()
+    # ipdb.set_trace()
+
     data = preprocess_data(data=data,
                            desired_n_data_points=10000,
-                           smoothing_sigma=None)
+                           smoothing_sigma=1)
+
+
+
+
+
+
+
+
+
     sys_id(robot=robot,
            angle=data['angle'],
            velocity=data['velocity'],
@@ -634,8 +663,8 @@ def test_sys_id_visually():
 
 if __name__ == '__main__':
     try:
-        test_sys_id_simumlated_torques()
         test_sys_id_visually()
+        test_sys_id_simumlated_torques()
 
     except:
         traceback.print_exc(sys.stdout)
