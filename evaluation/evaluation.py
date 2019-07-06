@@ -78,13 +78,19 @@ def evaluate(dynamics_learner, observation_sequences, action_sequences,
     return errors_to_return[0]
 
 def get_evaluation_errors(all_errors):
-    angle_errors = all_errors[:,:, :3]
-    norms = np.linalg.norm(angle_errors, axis=-1, ord=1)
-    norms = np.sum(norms, axis=1)
+    evaluation_errors = {}
+    evaluation_errors['angle'] = all_errors[:,:, :3]
+    evaluation_errors['velocity'] = all_errors[:,:, 3:6]
+    evaluation_errors['torque'] = all_errors[:,:, 6:9]
 
-    norms = norms / angle_errors.size * norms.size
+    for key in evaluation_errors.keys():
+        norms = np.linalg.norm(evaluation_errors[key], axis=-1, ord=1)
+        norms = np.sum(norms, axis=1)
 
-    return norms.flatten()
+        # norms = norms / evaluation_errors[key].size * norms.size
+        evaluation_errors[key] = norms.flatten()
+
+    return evaluation_errors
 
 
 
