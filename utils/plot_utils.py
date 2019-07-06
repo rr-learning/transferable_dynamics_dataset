@@ -108,6 +108,7 @@ def path_to_error_file(method_name,
         ho_path = "/agbs/dynlearning/Errors from HO/prediction_horizon_{0}_history_length_{1}_epochs_40/".format(prediction_horizon, history_length)
         return get_path_to_run(num_layers, num_units, lr, reg, path_to_ho=ho_path)
     else:
+        print(method_name)
         assert (False)
 
     return os.path.join(path_to_results, error_file_name)
