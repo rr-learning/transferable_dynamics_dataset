@@ -276,6 +276,10 @@ class Robot(RobotWrapper):
         theta = np.concatenate(theta, axis=0)
         return theta
 
+    def get_inertia_matrix(self, joint_index):
+        return np.array(self.model.inertias[joint_index + 1].inertia)
+
+
     def set_params(self, theta):
         for dof in xrange(self.model.nv):
             theta_dof = theta[dof * 10: (dof + 1) * 10]
@@ -578,6 +582,7 @@ def test_sys_id_simumlated_torques():
     for key in data.keys():
         data[key] = data[key][:, 10000: 10200]
 
+
     data['torque'] = [[robot.inverse_dynamics(
         angle=data['angle'][trajectory_idx, t],
         velocity=data['velocity'][trajectory_idx, t],
@@ -660,9 +665,18 @@ def test_sys_id_visually():
 
     # robot.simulate(dt=0.001, n_steps=10000)
 
+def check_inertias():
+    robot = Robot()
+
+
+    inertia_matrix = robot.get_inertia_matrix(0)
+
+    ipdb.set_trace()
+
 
 if __name__ == '__main__':
     try:
+        check_inertias()
         test_sys_id_visually()
         test_sys_id_simumlated_torques()
 
