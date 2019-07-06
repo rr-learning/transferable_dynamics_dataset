@@ -461,24 +461,24 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
     J = []
     constraints = []
     for i in range(3):
-        J += [cvxpy.bmat([[0.5*(-theta[i*12+4]+theta[i*12+6]+theta[i*12+9]), -theta[i*12+5], -theta[i*12+7], theta[i*12+1]],
-                            [-theta[i*12+5], 0.5*(theta[i*12+4]-theta[i*12+6]+theta[i*12+9]), -theta[i*12+8], theta[i*12+2]],
-                            [-theta[i*12+7], -theta[i*12+8], 0.5*(theta[i*12+4]+theta[i*12+6]-theta[i*12+9]), theta[i*12+3]],
-                            [theta[i*12+1], theta[i*12+2], theta[i*12+3], theta[i*12]]])]
+        J += [cvxpy.bmat([[0.5*(-theta[i*10+4]+theta[i*10+6]+theta[i*10+9]), -theta[i*10+5], -theta[i*10+7], theta[i*10+1]],
+                            [-theta[i*10+5], 0.5*(theta[i*10+4]-theta[i*10+6]+theta[i*10+9]), -theta[i*10+8], theta[i*10+2]],
+                            [-theta[i*10+7], -theta[i*10+8], 0.5*(theta[i*10+4]+theta[i*10+6]-theta[i*10+9]), theta[i*10+3]],
+                            [theta[i*10+1], theta[i*10+2], theta[i*10+3], theta[i*10]]])]
         constraints += [J[i] >> 0]
 
     # mass
     constraints += [theta[0] >= 0.1]
     constraints += [theta[0] <= 1]
-    constraints += [theta[12] >= 0.1]
-    constraints += [theta[12] <= 1]
-    constraints += [theta[24] >= 0.03]
-    constraints += [theta[24] <= 1]
+    constraints += [theta[10] >= 0.1]
+    constraints += [theta[10] <= 1]
+    constraints += [theta[20] >= 0.03]
+    constraints += [theta[20] <= 1]
     # friction coeffs
-    constraints += [theta[10] >= 0]
-    constraints += [theta[11] >= 0]
-    constraints += [theta[22] >= 0]
-    constraints += [theta[23] >= 0]
+    constraints += [theta[30] >= 0]
+    constraints += [theta[31] >= 0]
+    constraints += [theta[32] >= 0]
+    constraints += [theta[33] >= 0]
     constraints += [theta[34] >= 0]
     constraints += [theta[35] >= 0]
     # COM*mass, assumes an upper bound of 1kg on the link mass
@@ -488,21 +488,21 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
     constraints += [theta[2] >= -0.2]
     constraints += [theta[3] <= 0.2]
     constraints += [theta[3] >= -0.2]
+    constraints += [theta[11] <= 0.2]
+    constraints += [theta[11] >= -0.2]
+    constraints += [theta[12] <= 0.2]
+    constraints += [theta[12] >= -0.2]
     constraints += [theta[13] <= 0.2]
     constraints += [theta[13] >= -0.2]
-    constraints += [theta[14] <= 0.2]
-    constraints += [theta[14] >= -0.2]
-    constraints += [theta[15] <= 0.2]
-    constraints += [theta[15] >= -0.2]
-    constraints += [theta[25] <= 0.2]
-    constraints += [theta[25] >= -0.2]
-    constraints += [theta[26] <= 0.2]
-    constraints += [theta[26] >= -0.2]
-    constraints += [theta[27] <= 0.2]
-    constraints += [theta[28] >= -0.2]
+    constraints += [theta[21] <= 0.2]
+    constraints += [theta[21] >= -0.2]
+    constraints += [theta[22] <= 0.2]
+    constraints += [theta[22] >= -0.2]
+    constraints += [theta[23] <= 0.2]
+    constraints += [theta[23] >= -0.2]
 
     prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
-    prob.solve(verbose=False,eps=10e-8,max_iters=20000,solver='SCS')
+    prob.solve(verbose=False,eps=10e-6, max_iters=10000,solver='SCS')
 
     theta = theta.value
 
