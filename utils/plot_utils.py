@@ -1,7 +1,26 @@
 import pandas as pd
 import numpy as np
+import re
 import os
 from DL.evaluation.evaluation import get_angle_errors, compute_RMSE_from_errors
+import re
+
+
+def get_path_to_run(num_layers, num_units, lr, reg,  path_to_ho="/is/cluster/azadaianchuk/hyperparameter_optimization/dynamics_learning/NN/split_5/prediction_horizon_100_history_length_1_epochs_40/"):
+    # path_to_ho="/is/cluster/azadaianchuk/hyperparameter_optimization/dynamics_learning/NN/split_5/prediction_horizon_100_history_length_1_epochs_40/"
+    jobs_info = pd.read_csv(os.path.join(path_to_ho, "job_info.csv"))
+    jobs_info["model_train_params"]
+    run_id = None
+    for arch, train, id in zip(jobs_info["model_arch_params"], jobs_info["model_train_params"], jobs_info["id"]):
+        arch = eval(arch)
+        train = eval(train)
+        if arch["num_layers"] == num_layers and arch["num_units"] == num_units and train["learning_rate"] == lr and train["l2_reg"] == reg:
+            run_id = id
+    if run_id is not None:
+        return os.path.join(path_to_ho, "{}_".format(run_id), "errors.npz")
+    else:
+        print("No such run in given folder")
+
 
 def get_diego_index(prediction_horizon,
                     history_length,
@@ -76,6 +95,11 @@ def path_to_error_file(method_name,
                           '__history_' + str(history_length).zfill(2) + \
                           '__identification_method_' + identification_method + \
                           '.npz'
+    elif bool(re.compile("NN_layers_[0-9]_width_[0-9]+_lr_0.0001_reg_0.0001").match(method_name)):
+        method_name = "NN_layers__3_width__64_lr_0.0001_reg_0.0001"
+        pattern2 = re.compile("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?")
+        (num_layers, num_units, lr, reg) = [float(str) for str in pattern2.findall(method_name)]
+        return get_path_to_run(num_layers, num_units, lr, reg)
     else:
         assert (False)
 
