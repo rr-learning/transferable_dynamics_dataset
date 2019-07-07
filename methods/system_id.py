@@ -96,7 +96,7 @@ class SystemId(DynamicsLearnerInterface):
         predictions = np.empty((n_samples, dim_observation))
         predictions[:] = numpy.nan
 
-        for i in xrange(n_samples):
+        for i in range(n_samples):
             torques_sequence = np.append(action_history[i, -1:],
                                          action_future[i],
                                          axis=0)
@@ -110,7 +110,7 @@ class SystemId(DynamicsLearnerInterface):
             if self.prediction_horizon == 1000:
                 integration_step_ms = 10
 
-            for t in xrange(0, self.prediction_horizon, integration_step_ms):
+            for t in range(0, self.prediction_horizon, integration_step_ms):
                 torque = np.average(
                     torques_sequence[t: t + integration_step_ms], axis=0)
                 angle, velocity = \
@@ -173,7 +173,7 @@ class Robot(RobotWrapper):
 
         self.initViewer(loadModel=True)
         last_time = time.time()
-        for t in xrange(torque.shape[0]):
+        for t in range(torque.shape[0]):
             acceleration = self.forward_dynamics(angle, velocity, torque[t])
 
             angle = angle + np.multiply(mask, velocity * dt)
@@ -197,7 +197,7 @@ class Robot(RobotWrapper):
         self.initViewer(loadModel=True)
 
         last_time = time.time()
-        for t in xrange(angle.shape[0]):
+        for t in range(angle.shape[0]):
             self.display(to_matrix(angle[t]))
 
             sleep_time = last_time + dt - time.time()
@@ -268,19 +268,27 @@ class Robot(RobotWrapper):
     # getters and setters ------------------------------------------------------
     def get_params(self):
         theta = [self.model.inertias[i].toDynamicParameters()
-                 for i in xrange(1, len(self.model.inertias))]
+                 for i in range(1, len(self.model.inertias))]
 
         theta = theta + [self.viscous_friction, self.static_friction]
 
         theta = np.concatenate(theta, axis=0)
         return theta
 
-    def get_inertia_matrix(self, joint_index):
-        return np.array(self.model.inertias[joint_index + 1].inertia)
+    def get_com(self, link_index):
+        raise NotImplementedError
+
+    def get_mass(self, link_index):
+        raise NotImplementedError
+
+    def get_inertia_matrix_link_frame(self, link_index):
+        return np.array(self.model.inertias[link_index + 1].inertia)
 
     def set_params(self, theta):
-        for dof in xrange(self.model.nv):
+
+        for dof in range(self.model.nv):
             theta_dof = theta[dof * 10: (dof + 1) * 10]
+
             self.model.inertias[dof + 1] = \
                 pinocchio.libpinocchio_pywrap.Inertia.FromDynamicParameters(
                     theta_dof)
@@ -305,7 +313,7 @@ class Robot(RobotWrapper):
 
 
 def test_regressor_matrix(robot):
-    for _ in xrange(100):
+    for _ in range(100):
         angle = pinocchio.randomConfiguration(robot.model)
         velocity = pinocchio.utils.rand(robot.model.nv)
         acceleration = pinocchio.utils.rand(robot.model.nv)
@@ -361,7 +369,7 @@ def preprocess_data(data, desired_n_data_points,
     # cut off ends -------------------------------------------------------------
     for key in data.keys():
         data[key] = data[key][:,
-                    data[key].shape[1] / 10: -data[key].shape[1] / 10]
+                    data[key].shape[1] // 10: -data[key].shape[1] // 10]
 
     # reshape ------------------------------------------------------------------
     ordered_data = data.copy()
@@ -371,7 +379,7 @@ def preprocess_data(data, desired_n_data_points,
     for key in data.keys():
         data[key] = np.reshape(data[key], [n_data_points, 3])
 
-    for _ in xrange(10):
+    for _ in range(10):
         trajectory_idx = np.random.randint(n_trajectories)
         time_step = np.random.randint(n_time_steps)
 
@@ -405,7 +413,7 @@ def rmse_sequential(robot, angle, velocity, acceleration, torque):
 
     T = angle.shape[0]
 
-    for t in xrange(T):
+    for t in range(T):
         predicted_torque = robot.inverse_dynamics(angle=angle[t],
                                                   velocity=velocity[t],
                                                   acceleration=acceleration[t])
@@ -431,10 +439,134 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
     Y = np.concatenate(
         [robot.compute_regressor_matrix(angle[t], velocity[t], acceleration[t])
          for t in
-         xrange(angle.shape[0])], axis=0)
+         range(angle.shape[0])], axis=0)
 
     T = np.concatenate(
-        [to_matrix(torque[t]) for t in xrange(angle.shape[0])], axis=0)
+        [to_matrix(torque[t]) for t in range(angle.shape[0])], axis=0)
+
+    log['rmse_sequential_before_id'] = rmse_sequential(robot=robot,
+                                                       angle=angle,
+                                                       velocity=velocity,
+                                                       acceleration=acceleration,
+                                                       torque=torque)
+    log['rmse_batch_before_id'] = rmse_batch(theta=robot.get_params(),
+                                             Y=Y, T=T)
+
+    # Constrained optimization using CVXPY
+    # theta = [m, mc_x, mc_y, mc_z, I_xx, I_xy, I_yy, I_xz, I_yz, I_zz]
+    theta = cvxpy.Variable((36, 1))
+
+    prior = robot.get_params().A
+    theta = cvxpy.Variable((36, 1))
+    cost = cvxpy.norm(Y * theta - T, 1) + 1e-6 * cvxpy.norm(
+        theta - prior, 2)
+
+    I = []
+    J = []
+    m = []
+    mc = []
+    for i in range(3):
+        m_i = theta[10 * i]
+        mc_i = [theta[10 * i + 1], theta[10 * i + 2], theta[10 * i + 3]]
+
+        I_i = [[theta[10 * i + 4], theta[10 * i + 5], theta[10 * i + 7]],
+               [theta[10 * i + 5], theta[10 * i + 6], theta[10 * i + 8]],
+               [theta[10 * i + 7], theta[10 * i + 8], theta[10 * i + 9]]]
+
+
+
+    fr_v = [theta[30], theta[31], theta[32]]
+    fr_s = [theta[33], theta[34], theta[35]]
+
+
+    J = []
+    constraints = []
+    for i in range(3):
+        J += [cvxpy.bmat([
+            [0.5 * (-theta[i * 10 + 4] + theta[i * 10 + 6] + theta[i * 10 + 9]),
+             -theta[i * 10 + 5],
+             -theta[i * 10 + 7],
+             theta[i * 10 + 1]],
+            [
+                -theta[i * 10 + 5],
+                0.5 * (theta[i * 10 + 4] - theta[i * 10 + 6] + theta[
+                    i * 10 + 9]),
+                -theta[i * 10 + 8],
+                theta[i * 10 + 2]],
+            [
+                -theta[i * 10 + 7],
+                -theta[i * 10 + 8],
+                0.5 * (theta[i * 10 + 4] + theta[i * 10 + 6] - theta[
+                    i * 10 + 9]),
+                theta[i * 10 + 3]],
+            [
+                theta[i * 10 + 1],
+                theta[i * 10 + 2],
+                theta[i * 10 + 3],
+                theta[i * 10]]])]
+
+        constraints += [J[i] >> 0]
+        constraints += [theta[10 * i + 4] <= 0.005]
+        constraints += [theta[10 * i + 6] <= 0.005]
+        constraints += [theta[10 * i + 9] <= 0.005]
+
+
+
+    mass_indices = [0, 10, 20]
+    for i in mass_indices:
+        constraints += [theta[i] <= 0.3] + [theta[i] >= 0.05]
+
+    friction_indices = [30, 31, 32, 33, 34, 35]
+    for i in friction_indices:
+        constraints += [theta[i] >= 0]
+
+    com_indices = [1, 2, 3, 11, 12, 13, 21, 22, 23]
+    for i in com_indices:
+        constraints += [theta[com_indices] <= 0.03] + [
+            theta[com_indices] >= -0.03]
+
+    prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
+    prob.solve(verbose=True, eps=10e-6, max_iters=2000, solver='SCS')
+
+    theta = theta.value
+
+    log['rmse_batch_optimal_theta_after_id_lmi'] = rmse_batch(theta=theta,
+                                                              Y=Y, T=T)
+
+    robot.set_params(theta)
+
+    test_regressor_matrix(robot)
+
+    log['rmse_sequential_after_id_lmi'] = rmse_sequential(robot=robot,
+                                                          angle=angle,
+                                                          velocity=velocity,
+                                                          acceleration=acceleration,
+                                                          torque=torque)
+    log['rmse_batch_after_id_lmi'] = rmse_batch(theta=robot.get_params(), Y=Y,
+                                                T=T)
+
+    for key in log.keys():
+        print(key + ': ', log[key], '\n')
+
+    for i in range(len(robot.model.inertias)):
+        print(robot.model.inertias[i])
+
+    print('static_friction: ', robot.static_friction, '\n',
+          'visous_friction: ', robot.viscous_friction)
+
+
+def sys_id_lmi_diagonal(robot, angle, velocity, acceleration, torque):
+    log = dict()
+
+    test_regressor_matrix(robot)
+
+    Y = np.concatenate(
+        [robot.compute_regressor_matrix(angle[t], velocity[t], acceleration[t])
+         for t in
+         range(angle.shape[0])], axis=0)
+
+    T = np.concatenate(
+        [to_matrix(torque[t]) for t in range(angle.shape[0])], axis=0)
 
     log['rmse_sequential_before_id'] = rmse_sequential(robot=robot,
                                                        angle=angle,
@@ -483,7 +615,7 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
 
     mass_indices = [0, 10, 20]
     for i in mass_indices:
-        constraints += [theta[i] <= 1] + [theta[0] >= 0]
+        constraints += [theta[i] <= 0.3] + [theta[i] >= 0.05]
 
     friction_indices = [30, 31, 32, 33, 34, 35]
     for i in friction_indices:
@@ -491,8 +623,8 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
 
     com_indices = [1, 2, 3, 11, 12, 13, 21, 22, 23]
     for i in com_indices:
-        constraints += [theta[com_indices] <= 0.2] + [
-            theta[com_indices] >= -0.2]
+        constraints += [theta[com_indices] <= 0.03] + [
+            theta[com_indices] >= -0.03]
 
     prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
     prob.solve(verbose=False, eps=10e-6, max_iters=10000, solver='SCS')
@@ -517,6 +649,14 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
     for key in log.keys():
         print(key + ': ', log[key], '\n')
 
+    for i in range(len(robot.model.inertias)):
+        print(robot.model.inertias[i])
+
+    print('static_friction: ', robot.static_friction, '\n',
+          'visous_friction: ', robot.viscous_friction)
+
+    ipdb.set_trace()
+
 
 def sys_id(robot, angle, velocity, acceleration, torque):
     log = dict()
@@ -526,10 +666,10 @@ def sys_id(robot, angle, velocity, acceleration, torque):
     Y = np.concatenate(
         [robot.compute_regressor_matrix(angle[t], velocity[t], acceleration[t])
          for t in
-         xrange(angle.shape[0])], axis=0)
+         range(angle.shape[0])], axis=0)
 
     T = np.concatenate(
-        [to_matrix(torque[t]) for t in xrange(angle.shape[0])], axis=0)
+        [to_matrix(torque[t]) for t in range(angle.shape[0])], axis=0)
 
     log['rmse_sequential_before_id'] = rmse_sequential(robot=robot,
                                                        angle=angle,
@@ -540,7 +680,7 @@ def sys_id(robot, angle, velocity, acceleration, torque):
                                              Y=Y, T=T)
 
     regularization_epsilon = 1e-10
-    regularization_mu = robot.get_params()
+    regularization_mu = 1e-6
     theta = np.linalg.solve(
         Y.transpose() * Y + regularization_epsilon * np.eye(Y.shape[1],
                                                             Y.shape[1]),
@@ -548,6 +688,11 @@ def sys_id(robot, angle, velocity, acceleration, torque):
 
     log['rmse_batch_optimal_theta_after_id'] = rmse_batch(theta=theta,
                                                           Y=Y, T=T)
+
+    # for key in log.keys():
+    #     print(key + ': ', log[key], '\n')
+
+    # ipdb.set_trace()
 
     robot.set_params(theta)
 
@@ -580,8 +725,8 @@ def test_sys_id_simumlated_torques():
         angle=data['angle'][trajectory_idx, t],
         velocity=data['velocity'][trajectory_idx, t],
         acceleration=data['acceleration'][trajectory_idx, t])
-        for t in xrange(data['angle'].shape[1])]
-        for trajectory_idx in xrange(data['angle'].shape[0])]
+        for t in range(data['angle'].shape[1])]
+        for trajectory_idx in range(data['angle'].shape[0])]
     data['torque'] = np.array(data['torque']).squeeze()
 
     # the usual preprocessing --------------------------------------------------
@@ -650,21 +795,79 @@ def test_sys_id_visually():
     # robot.simulate(dt=0.001, n_steps=10000)
 
 
+def test_sys_id_lmi():
+    robot = Robot()
+    # robot.simulate(dt=0.001,
+    #                n_steps=1000,
+    #                torque=[0.1, 0.1, 0.1],
+    #                initial_angle=[1, 1, 1],
+    #                mask=[1, 1, 1])
+
+    # robot.simulate(dt=0.001, n_steps=10000)
+
+    data = load_data()
+    data = compute_accelerations(data)
+
+    # # plot ---------------------------------------------------------------------
+    # for key in data.keys():
+    #     data[key] = gaussian_filter1d(data[key],
+    #                                   sigma=3,
+    #                                   axis=1)
+    #
+    #
+    # dim = 2
+    # sample = 50
+    # data['velocity'] /= 20
+    # stuff = ['torque', 'acceleration', 'velocity']
+    # for key in stuff:
+    #     plt.plot(data[key][sample, 1000:2000, dim])
+    #
+    # plt.legend(stuff)
+    #
+    # # plt.ylim([-10, 10])
+    #
+    # plt.show()
+    # ipdb.set_trace()
+
+    data = preprocess_data(data=data,
+                           desired_n_data_points=10000,
+                           smoothing_sigma=1)
+
+    sys_id_lmi(robot=robot,
+               angle=data['angle'],
+               velocity=data['velocity'],
+               acceleration=data['acceleration'],
+               torque=data['torque'])
+
+    # robot.simulate(dt=0.001, n_steps=10000)
+
+
 def check_inertias():
     robot = Robot()
 
-    inertia_matrix = robot.get_inertia_matrix(0)
+    inertia_matrix = robot.get_inertia_matrix_link_frame(0)
 
     ipdb.set_trace()
 
 
 if __name__ == '__main__':
     try:
-        check_inertias()
-        test_sys_id_visually()
-        test_sys_id_simumlated_torques()
+
+        robot = Robot()
+        print(robot.model.inertias[2])
+
+        # ipdb.set_trace()
+
+        # check_inertias()
+        test_sys_id_lmi()
+        #
+        # exit()
+        #
+        # test_sys_id_visually()
+        # test_sys_id_simumlated_torques()
+
 
     except:
-        traceback.print_exc(sys.stdout)
         _, _, tb = sys.exc_info()
+        traceback.print_exc()
         ipdb.post_mortem(tb)
