@@ -5,8 +5,14 @@ from torch.autograd import Variable
 
 import numpy as np
 import math
+import os
+
+from itertools import islice
+from itertools import chain
 
 from DL import DynamicsLearnerInterface
+
+MODE = 'MAP'
 
 class BNNLearner(DynamicsLearnerInterface):
     def __init__(self, history_length, prediction_horizon,
@@ -14,8 +20,14 @@ class BNNLearner(DynamicsLearnerInterface):
                  optim_epochs=1, # TODO: redo 400
                  hidden_units=[100, 100],
                  prior_mean=0, prior_std=1,
-                 batch_size=10000):
-        super().__init__(history_length, prediction_horizon)
+                 batch_size=512,
+                 predDim=3,  # will only predict the first predDim dimensions
+                 averaging=None,
+                 streaming=None):
+        super().__init__(history_length, prediction_horizon,
+        difference_learning, averaging=averaging, streaming=streaming)
+        print("streaming = {}".format(streaming))
+        print("averaging = {}".format(averaging))
 #        self.history_length = history_length
 #        self.prediction_horizon = prediction_horizon
 #        self.observation_dimension = 9
@@ -31,11 +43,18 @@ class BNNLearner(DynamicsLearnerInterface):
         self.prior_std = prior_std
         self.batch_size = int(np.loadtxt("batch_size.csv"))
         # create models
-        self.input_dim = self.history_length*(self.observation_dimension + self.action_dimension)
-        self.output_dim = self.observation_dimension
+        self.predDim = predDim
+        if averaging:
+            self.input_dim = self.observation_dimension + self.action_dimension
+            if prediction_horizon > 1:
+                self.input_dim += self.action_dimension
+        else:
+            self.input_dim = self.history_length*(self.observation_dimension + self.action_dimension) \
+                           + (self.prediction_horizon-1)*(self.action_dimension)
+        self.output_dim = self.predDim
         self.models_ = []
         self.optims_ = []
-        for i in range(self.observation_dimension):
+        for i in range(self.predDim):
             # create model and append to model list
             layers = []
             input_layer = BNNLayer(self.input_dim,
@@ -61,19 +80,22 @@ class BNNLearner(DynamicsLearnerInterface):
             
             optim = torch.optim.Adam(self.models_[-1].parameters(),
                                      lr=self.learning_rate)
-            self.optims_.append(optim)     
-        
+            self.optims_.append(optim)
+
     def name(self):
         return "BNN"        
 
     def _learn(self, training_inputs, training_targets):
+        print("non-streaming training")
+        print(training_inputs.shape)
+        print(training_targets.shape)
         Var = lambda x, dtype=torch.FloatTensor: Variable(torch.from_numpy(x).type(dtype))
 #        print(training_inputs.size())
 #        print(training_targets[:, 1].reshape((-1, 1)).shape)
         if self.batch_size is None:
             training_inputs = Var(training_inputs)
             training_targets = Var(training_targets)
-            for i in range(self.observation_dimension):
+            for i in range(self.predDim):
                 for i_ep in range(self.optim_epochs):
                     kl, lg_lklh = self.models_[i].Forward(
                         training_inputs, training_targets[:, i].reshape((-1, 1)), 1, 'Gaussian')
@@ -81,7 +103,7 @@ class BNNLearner(DynamicsLearnerInterface):
                     self.optims_[i].zero_grad()
                     loss.backward()
                     self.optims_[i].step()
-                    print("{}.{} / {}.{}".format(i, i_ep, self.observation_dimension, self.optim_epochs))
+#                    print("{}.{} / {}.{}".format(i, i_ep, self.observation_dimension, self.optim_epochs))
         else:
             dataSize = training_targets[:, 1].size
             stepsPerEpoch = dataSize / self.batch_size
@@ -92,16 +114,88 @@ class BNNLearner(DynamicsLearnerInterface):
                     training_inputs, training_targets)
                 currInputs = Var(currInputs)
                 currTargets = Var(currTargets)
-                for dim in range(self.observation_dimension):
+                for dim in range(self.predDim):
                     kl, lg_lklh = self.models_[dim].Forward(
                         currInputs, currTargets[:, dim].reshape((-1, 1)), 1, 'Gaussian')
                     loss = BNN.loss_fn(kl, lg_lklh, 1)
                     self.optims_[dim].zero_grad()
                     loss.backward()
                     self.optims_[dim].step()
-                    print("{}.{} / {}.{}".format(i_ep, dim, nSteps, self.observation_dimension))
-                    
-   
+#                    print("{}.{} / {}.{}".format(i_ep, dim, nSteps, self.observation_dimension))
+    def _getNewData(self, generator):
+       """
+       returns chunks of training data and corresponding targets
+       """
+       currData = np.asarray(list(islice(generator, self.batch_size)))
+       newDataTargets = np.fromiter(chain.from_iterable(currData[:, 0]),
+                                    dtype=np.float).reshape([512, self.observation_dimension])
+       newDataTrain = np.fromiter(chain.from_iterable(currData[:, 1]),
+                                  dtype=np.float).reshape([512, self.input_dim])
+       return newDataTrain, newDataTargets #
+
+    def _learn_from_stream(self, generator, datastream_size):
+        """
+        Parameters
+        ----------
+        training_inputs:        np-array of shape nTrainingInstances x input dim
+                                that represents the input to the dynamics
+                                (i.e. relevant observations and actions within
+                                the history length and prediction horizon)
+        training_targets:       np-array of shape nTrainingInstances x state dim
+                                denoting the targets of the dynamics model.
+        """
+        print("streaming training")
+        print("data stream size: {}".format(datastream_size))
+        print("object size 1: {}".format(next(generator)[0].shape))
+        print("object size 2: {}".format(next(generator)[1].shape))
+        Var = lambda x, dtype=torch.FloatTensor: Variable(torch.from_numpy(x).type(dtype))
+
+        dataSize = datastream_size
+        stepsPerEpoch = dataSize / self.batch_size
+        nSteps = int(np.ceil(self.optim_epochs * stepsPerEpoch))
+        print("steps: {}".format(nSteps))
+        for i_ep in range(nSteps):
+            # subsample
+            currInputs, currTargets = self._getNewData(generator)
+            currInputs = Var(currInputs)
+            currTargets = Var(currTargets)
+            for dim in range(self.predDim):
+                kl, lg_lklh = self.models_[dim].Forward(
+                    currInputs, currTargets[:, dim].reshape((-1, 1)), 1, 'Gaussian')
+                loss = BNN.loss_fn(kl, lg_lklh, 1)
+                self.optims_[dim].zero_grad()
+                loss.backward()
+                self.optims_[dim].step()
+
+#        for count in range(self.epochs_ * datastream_size):
+#            training_target, training_input = next(generator)
+#            assert training_input.shape[0] == self._get_input_dim()
+#            model_input = training_input.reshape(1, -1)
+#            
+#            for output_idx in range(self.observation_dimension):
+#                model_target = training_target[output_idx:output_idx + 1]
+#                self.models_[output_idx].partial_fit(model_input, model_target)
+#        
+#        
+#        
+#
+#        input_output_shapes = ([self.input_dim], [self.output_dim])
+#        input_output_dtypes = (tf.float64, tf.float64)
+#        def switch_input_target():
+#            def gen():
+#                for target, input in generator:
+#                    yield input, target
+#            return gen
+#        ds = tf.data.Dataset.from_generator(switch_input_target(),
+#                input_output_dtypes, input_output_shapes)
+#        ds = ds.repeat()
+#        ds = ds.batch(self.batch_size)
+#        self.model.fit(ds.make_one_shot_iterator(),
+#                       steps_per_epoch=datastream_size//self.batch_size,
+#                       epochs=self.epochs,
+#                       callbacks=[self.tensorboard]
+        
+
     def _subsample_training_set(self, training_inputs, training_targets):
         assert self.batch_size
         total_size = training_inputs.shape[0]
@@ -115,9 +209,12 @@ class BNNLearner(DynamicsLearnerInterface):
         Var = lambda x, dtype=torch.FloatTensor: Variable(torch.from_numpy(x).type(dtype))
         X_ = Var(inputs)
         for i, model in enumerate(self.models_):
-            pred_lst = [model.forward(X_, mode='MC').data.numpy() for _ in range(40)]
-            pred = np.array(pred_lst).T            
-            prediction[:, i] = pred.mean(axis=2)
+            if MODE == 'MC':
+                pred_lst = [model.forward(X_, mode='MC').data.numpy() for _ in range(40)]
+                pred = np.array(pred_lst).T            
+                prediction[:, i] = pred.mean(axis=2)
+            else:
+                prediction[:, i] = np.squeeze(model.forward(X_, mode='MAP').data.numpy())
         return prediction
 
     def load(self, filename):
@@ -134,9 +231,10 @@ class BNNLearner(DynamicsLearnerInterface):
         ----------
         filename:   string used as filename to save a model.
         """
-        layers = BNN.layers
-        raise NotImplementedError
-
+        if not os.path.exists(filename):
+            os.makedirs(filename)
+        for i, model in enumerate(self.models_):
+            torch.save(model.state_dict(), os.path.join(filename, "state{}.pt".format(i)))
 
 class BNN(nn.Module):
     def __init__(self, layers):
