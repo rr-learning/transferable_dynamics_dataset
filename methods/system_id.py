@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import argparse
 import sys
 import ipdb
 import traceback
@@ -23,8 +24,7 @@ import rospkg
 
 import time
 
-if sys.version_info[0] >= 3:
-    import cvxpy
+import cvxpy
 
 # dynamics learning stuff
 from DL import DynamicsLearnerInterface
@@ -328,7 +328,7 @@ def test_regressor_matrix(robot):
 
 
 def load_data():
-    all_data = np.load('/is/ei/mwuthrich/dataset_v06_sines_full.npz')
+    all_data = np.load(args.input)
 
     data = dict()
     data['angle'] = all_data['measured_angles']
@@ -852,7 +852,11 @@ def check_inertias():
 
 if __name__ == '__main__':
     try:
-
+        parser = argparse.ArgumentParser(description='system id baseline')
+        parser.add_argument("--input",
+                help="Filename of the input robot data",
+                default='/is/ei/mwuthrich/dataset_v06_sines_full.npz')
+        args = parser.parse_args()
         robot = Robot()
         print(robot.model.inertias[2])
 
@@ -865,7 +869,6 @@ if __name__ == '__main__':
         #
         # test_sys_id_visually()
         # test_sys_id_simumlated_torques()
-
 
     except:
         _, _, tb = sys.exc_info()
