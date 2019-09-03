@@ -16,6 +16,7 @@ import matplotlib.pylab as plt
 import pinocchio
 
 from pinocchio.robot_wrapper import RobotWrapper
+from pinocchio.visualize import *
 from os.path import join, dirname
 
 from scipy.ndimage import gaussian_filter1d
@@ -142,10 +143,16 @@ def to_diagonal_matrix(vector):
 
 
 class Robot(RobotWrapper):
-    def __init__(self):
+    def __init__(self, visualizer=None):
         self.load_urdf()
         self.viscous_friction = to_matrix(np.zeros(3)) + 0.01
         self.static_friction = to_matrix(np.zeros(3)) + 0.00
+        if visualizer == "meshcat":
+            self.setVisualizer(MeshcatVisualizer())
+        elif visualizer == "gepetto":
+            self.setVisualizer(GepettoVisualizer())
+        elif visualizer:
+            raise NotImplementedError
 
     # dynamics -----------------------------------------------------------------
     def simulate(self,
@@ -749,14 +756,15 @@ def test_sys_id_simumlated_torques():
 
 
 def test_sys_id_visually():
-    robot = Robot()
-    # robot.simulate(dt=0.001,
-    #                n_steps=1000,
-    #                torque=[0.1, 0.1, 0.1],
-    #                initial_angle=[1, 1, 1],
-    #                mask=[1, 1, 1])
+    assert args.visualizer
+    robot = Robot(visualizer=args.visualizer)
+    robot.simulate(dt=0.001,
+                   n_steps=1000,
+                   torque=[0.1, 0.1, 0.1],
+                   initial_angle=[1, 1, 1],
+                   mask=[1, 1, 1])
 
-    # robot.simulate(dt=0.001, n_steps=10000)
+    robot.simulate(dt=0.001, n_steps=10000)
 
     data = load_data()
     data = compute_accelerations(data)
@@ -856,6 +864,7 @@ if __name__ == '__main__':
         parser.add_argument("--input",
                 help="Filename of the input robot data",
                 default='/is/ei/mwuthrich/dataset_v06_sines_full.npz')
+        parser.add_argument("--visualizer", choices=['meshcat', 'gepetto'])
         args = parser.parse_args()
         robot = Robot()
         print(robot.model.inertias[2])
@@ -863,11 +872,11 @@ if __name__ == '__main__':
         # ipdb.set_trace()
 
         # check_inertias()
-        test_sys_id_lmi()
+        # test_sys_id_lmi()
         #
         # exit()
         #
-        # test_sys_id_visually()
+        test_sys_id_visually()
         # test_sys_id_simumlated_torques()
 
     except:
