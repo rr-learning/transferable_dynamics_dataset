@@ -200,23 +200,6 @@ class Robot(RobotWrapper):
                 print('time elapsed in cycle', current_time - last_time)
             last_time = current_time
 
-    def show_trajectory(self, dt, angle):
-        self.initViewer(loadModel=True)
-
-        last_time = time.time()
-        for t in range(angle.shape[0]):
-            self.display(to_matrix(angle[t]))
-
-            sleep_time = last_time + dt - time.time()
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-
-            current_time = time.time()
-            print('time elapsed in cycle', current_time - last_time)
-            last_time = current_time
-
-            print(angle[t])
-
     # TODO: this needs to be checked
     def predict(self, angle, velocity, torque, dt):
         angle = to_matrix(angle)
@@ -336,25 +319,29 @@ def test_regressor_matrix(robot):
 
 def load_data():
     all_data = np.load(args.input)
-
     data = dict()
     data['angle'] = all_data['measured_angles']
     data['velocity'] = all_data['measured_velocities']
-    ### TODO: not sure whether to take measured or constrained torques
+
+    # TODO: not sure whether to take measured or constrained torques
     data['torque'] = all_data['measured_torques']
-
-    # robot = Robot()
-    # sample_idx = 113
-    # robot.show_trajectory(dt=0.001,
-    #                       angle=data['angle'][sample_idx, :2000])
-    #
-    # robot.simulate(dt=0.001,
-    #                torque=data['torque'][sample_idx, :2000],
-    #                initial_angle=data['angle'][sample_idx, 0],
-    #                initial_velocity=data['velocity'][sample_idx, 0])
-
     return data
 
+def show_recorded_and_simulated_trajs():
+    robot = Robot(visualizer=args.visualizer)
+    data = load_data()
+    sample_idx = 113
+    time_steps = 2000
+    q_trajectory = np.matrix(data['angle'][sample_idx,:time_steps]).transpose()
+    robot.initViewer(loadModel=True)
+    print("Replay")
+    robot.play(q_trajectory=q_trajectory, dt=0.001)
+    print("Simulation")
+    robot = Robot(visualizer=args.visualizer)
+    robot.simulate(dt=0.001,
+                torque=data['torque'][sample_idx, :time_steps],
+                initial_angle=data['angle'][sample_idx, 0],
+                initial_velocity=data['velocity'][sample_idx, 0])
 
 def compute_accelerations(data):
     data['acceleration'] = np.diff(data['velocity'], axis=1)
@@ -764,7 +751,7 @@ def test_sys_id_visually():
                    initial_angle=[1, 1, 1],
                    mask=[1, 1, 1])
 
-    robot.simulate(dt=0.001, n_steps=10000)
+    # robot.simulate(dt=0.001, n_steps=10000)
 
     data = load_data()
     data = compute_accelerations(data)
@@ -868,6 +855,8 @@ if __name__ == '__main__':
         args = parser.parse_args()
         robot = Robot()
         print(robot.model.inertias[2])
+        if args.visualizer:
+            show_recorded_and_simulated_trajs()
 
         # ipdb.set_trace()
 
@@ -876,7 +865,7 @@ if __name__ == '__main__':
         #
         # exit()
         #
-        test_sys_id_visually()
+        # test_sys_id_visually()
         # test_sys_id_simumlated_torques()
 
     except:
