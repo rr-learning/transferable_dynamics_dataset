@@ -337,7 +337,6 @@ def show_recorded_and_simulated_trajs():
     print("Replay")
     robot.play(q_trajectory=q_trajectory, dt=0.001)
     print("Simulation")
-    robot = Robot(visualizer=args.visualizer)
     robot.simulate(dt=0.001,
                 torque=data['torque'][sample_idx, :time_steps],
                 initial_angle=data['angle'][sample_idx, 0],
@@ -388,6 +387,7 @@ def preprocess_data(data, desired_n_data_points,
     if shuffle_data:
         data_point_indices = np.random.permutation(data_point_indices)
 
+    assert desired_n_data_points <= n_data_points
     data_point_indices = data_point_indices[:desired_n_data_points]
 
     for key in data.keys():
@@ -704,7 +704,7 @@ def sys_id(robot, angle, velocity, acceleration, torque):
         print(key + ': ', log[key], '\n')
 
 
-def test_sys_id_simumlated_torques():
+def test_sys_id_simulated_torques():
     robot = Robot()
     test_regressor_matrix(robot)
 
@@ -858,15 +858,10 @@ if __name__ == '__main__':
         if args.visualizer:
             show_recorded_and_simulated_trajs()
 
-        # ipdb.set_trace()
-
         # check_inertias()
         # test_sys_id_lmi()
-        #
-        # exit()
-        #
         # test_sys_id_visually()
-        # test_sys_id_simumlated_torques()
+        # test_sys_id_simulated_torques()
 
     except:
         _, _, tb = sys.exc_info()
