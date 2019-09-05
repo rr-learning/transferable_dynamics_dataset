@@ -55,7 +55,7 @@ class SystemId(DynamicsLearnerInterface):
         data = preprocess_data(data=data,
                                desired_n_data_points=100000,
                                smoothing_sigma=1.0)
-        print('Learning with {} points'.format(len(data_point_indices)))
+        print('Learning with {} points'.format(data['angle'].shape[0]))
 
         # identify -------------------------------------------------------------
         if self.identification_method == 'cad':
