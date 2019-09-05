@@ -191,8 +191,8 @@ class Robot(RobotWrapper):
 
             acceleration = self.forward_dynamics(angle, velocity, torque[t])
 
-            angle = angle + np.multiply(mask, velocity * dt)
             velocity = velocity + np.multiply(mask, acceleration * dt)
+            angle = angle + np.multiply(mask, velocity * dt)
 
             if verbose:
                 print('angle: ', np.array(angle).flatten(),
