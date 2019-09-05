@@ -46,7 +46,6 @@ class SystemId(DynamicsLearnerInterface):
         self.identification_method = identification_method
 
     def learn(self, observation_sequences, action_sequences):
-        print('learning')
         # preprocess data ------------------------------------------------------
         data = dict()
         data['angle'] = observation_sequences[:, :, :3]
@@ -56,6 +55,7 @@ class SystemId(DynamicsLearnerInterface):
         data = preprocess_data(data=data,
                                desired_n_data_points=100000,
                                smoothing_sigma=1.0)
+        print('Learning with {} points'.format(len(data_point_indices)))
 
         # identify -------------------------------------------------------------
         if self.identification_method == 'cad':
@@ -396,8 +396,8 @@ def preprocess_data(data, desired_n_data_points,
     if shuffle_data:
         data_point_indices = np.random.permutation(data_point_indices)
 
-    assert desired_n_data_points <= n_data_points
-    data_point_indices = data_point_indices[:desired_n_data_points]
+    if desired_n_data_points < n_data_points:
+        data_point_indices = data_point_indices[:desired_n_data_points]
 
     for key in data.keys():
         data[key] = data[key][data_point_indices]
