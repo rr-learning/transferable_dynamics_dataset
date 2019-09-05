@@ -854,6 +854,18 @@ def check_inertias():
     ipdb.set_trace()
 
 
+def save_simulated_data(angles, velocities, torques, filename):
+    """Stores the simulated data in a compatible format with the dynamics
+       learning code."""
+    data_dict = {}
+    data_dict['measured_angles'] = angles
+    data_dict['measured_velocities'] = velocities
+    data_dict['measured_torques'] = torques
+    data_dict['constrained_torques'] = torques
+    data_dict['desired_torques'] = torques
+    np.savez(filename, **data_dict)
+
+
 if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser(description='system id baseline')
@@ -876,7 +888,10 @@ if __name__ == '__main__':
                     torque=data['torque'][sample_idx],
                     initial_angle=data['angle'][sample_idx, 0],
                     initial_velocity=data['velocity'][sample_idx, 0])
-            print(q.shape, qdot.shape, tau.shape)
+
+            # Creating an extra dimension to account for multiple sequences.
+            save_simulated_data(np.expand_dims(q, 0), np.expand_dims(qdot, 0),
+                np.expand_dims(tau, 0), args.output)
 
         # check_inertias()
         # test_sys_id_lmi()
