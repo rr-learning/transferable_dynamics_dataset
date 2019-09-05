@@ -163,6 +163,8 @@ class Robot(RobotWrapper):
                  initial_velocity=None,
                  mask=np.ones(3),
                  verbose=False):
+        """ Returns the sequence of angles, velocities and torques resulting
+            from simulating the given torques."""
         zero = pinocchio.utils.zero(self.model.nv)
 
         torque = np.array(zero) if torque is None else np.array(torque)
@@ -178,15 +180,20 @@ class Robot(RobotWrapper):
             zero if initial_velocity is None else to_matrix(initial_velocity)
         mask = to_matrix(mask)
 
-        self.initViewer(loadModel=True)
         last_time = time.time()
+        simulated_angles = []
+        simulated_vels = []
+        applied_torques = []
         for t in range(torque.shape[0]):
+            simulated_angles.append(np.ravel(angle))
+            simulated_vels.append(np.ravel(velocity))
+            applied_torques.append(np.ravel(torque[t]))
+
             acceleration = self.forward_dynamics(angle, velocity, torque[t])
 
             angle = angle + np.multiply(mask, velocity * dt)
             velocity = velocity + np.multiply(mask, acceleration * dt)
 
-            self.display(angle)
             if verbose:
                 print('angle: ', np.array(angle).flatten(),
                       '\nvelocity: ', np.array(velocity).flatten())
@@ -199,6 +206,8 @@ class Robot(RobotWrapper):
             if verbose:
                 print('time elapsed in cycle', current_time - last_time)
             last_time = current_time
+        return np.array(simulated_angles), np.array(simulated_vels), \
+                np.array(applied_torques)
 
     # TODO: this needs to be checked
     def predict(self, angle, velocity, torque, dt):
@@ -851,12 +860,23 @@ if __name__ == '__main__':
         parser.add_argument("--input",
                 help="Filename of the input robot data",
                 default='/is/ei/mwuthrich/dataset_v06_sines_full.npz')
+        parser.add_argument("--output",
+                help="Filename to save simulated robot data")
         parser.add_argument("--visualizer", choices=['meshcat', 'gepetto'])
         args = parser.parse_args()
         robot = Robot()
         print(robot.model.inertias[2])
-        if args.visualizer:
-            show_recorded_and_simulated_trajs()
+        if args.output:
+            assert args.input
+            data = load_data()
+
+            # Taking only one sequence for now.
+            sample_idx = 100
+            q, qdot, tau = robot.simulate(dt=0.001,
+                    torque=data['torque'][sample_idx],
+                    initial_angle=data['angle'][sample_idx, 0],
+                    initial_velocity=data['velocity'][sample_idx, 0])
+            print(q.shape, qdot.shape, tau.shape)
 
         # check_inertias()
         # test_sys_id_lmi()
