@@ -197,15 +197,6 @@ class Robot(RobotWrapper):
             if verbose:
                 print('angle: ', np.array(angle).flatten(),
                       '\nvelocity: ', np.array(velocity).flatten())
-
-            sleep_time = last_time + dt - time.time()
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-
-            current_time = time.time()
-            if verbose:
-                print('time elapsed in cycle', current_time - last_time)
-            last_time = current_time
         return np.array(simulated_angles), np.array(simulated_vels), \
                 np.array(applied_torques)
 
@@ -881,17 +872,21 @@ if __name__ == '__main__':
         if args.output:
             assert args.input
             data = load_data()
-
-            # Taking only one sequence for now.
-            sample_idx = 100
-            q, qdot, tau = robot.simulate(dt=0.001,
-                    torque=data['torque'][sample_idx],
-                    initial_angle=data['angle'][sample_idx, 0],
-                    initial_velocity=data['velocity'][sample_idx, 0])
-
-            # Creating an extra dimension to account for multiple sequences.
-            save_simulated_data(np.expand_dims(q, 0), np.expand_dims(qdot, 0),
-                np.expand_dims(tau, 0), args.output)
+            nseq = data['angle'].shape[0]
+            qs = []
+            qdots = []
+            taus = []
+            for sample_idx in range(nseq):
+                print(sample_idx)
+                q, qdot, tau = robot.simulate(dt=0.001,
+                        torque=data['torque'][sample_idx],
+                        initial_angle=data['angle'][sample_idx, 0],
+                        initial_velocity=data['velocity'][sample_idx, 0])
+                qs.append(np.expand_dims(q, 0))
+                qdots.append(np.expand_dims(qdot, 0))
+                taus.append(np.expand_dims(tau, 0))
+            save_simulated_data(np.vstack(qs), np.vstack(qdots),
+                    np.vstack(taus), args.output)
 
         # check_inertias()
         # test_sys_id_lmi()
