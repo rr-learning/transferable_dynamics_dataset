@@ -8,6 +8,7 @@ import traceback
 import numpy as np
 import numpy.matlib
 import time
+import os
 
 import math
 
@@ -297,14 +298,18 @@ class Robot(RobotWrapper):
 
     # loading ------------------------------------------------------------------
     def load_urdf(self):
-        urdf_path = (
-            join(rospkg.RosPack().get_path("robot_properties_manipulator"),
-                 "urdf",
-                 "manipulator.urdf"))
-        meshes_path = [
-            dirname(rospkg.RosPack().get_path("robot_properties_manipulator"))]
-
-        self.initFromURDF(urdf_path, meshes_path)
+        try:
+            model_path = rospkg.RosPack().get_path(
+                    "robot_properties_manipulator")
+        except rospkg.ResourceNotFound:
+            print('Warning: The URDF is not being loaded from a ROS package.')
+            current_path =  str(os.path.dirname(os.path.abspath(__file__)))
+            model_path =  str(os.path.abspath(os.path.join(current_path,
+                '../../robot_properties_manipulator')))
+        urdf_path = join(model_path, "urdf", "manipulator.urdf")
+        meshes_path = dirname(model_path)
+        print(urdf_path, meshes_path)
+        self.initFromURDF(urdf_path, [meshes_path])
 
 
 def test_regressor_matrix(robot):
