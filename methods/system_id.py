@@ -143,10 +143,11 @@ def to_diagonal_matrix(vector):
 
 
 class Robot(RobotWrapper):
-    def __init__(self, visualizer=None):
+    def __init__(self, symplectic=True, visualizer=None):
         self.load_urdf()
         self.viscous_friction = to_matrix(np.zeros(3)) + 0.01
         self.static_friction = to_matrix(np.zeros(3)) + 0.00
+        self.symplectic = symplectic
         if visualizer == "meshcat":
             self.setVisualizer(MeshcatVisualizer())
         elif visualizer == "gepetto":
@@ -188,12 +189,13 @@ class Robot(RobotWrapper):
             simulated_angles.append(np.ravel(angle))
             simulated_vels.append(np.ravel(velocity))
             applied_torques.append(np.ravel(torque[t]))
-
             acceleration = self.forward_dynamics(angle, velocity, torque[t])
-
-            velocity = velocity + np.multiply(mask, acceleration * dt)
-            angle = angle + np.multiply(mask, velocity * dt)
-
+            if self.symplectic:
+                velocity = velocity + np.multiply(mask, acceleration * dt)
+                angle = angle + np.multiply(mask, velocity * dt)
+            else:
+                angle = angle + np.multiply(mask, velocity * dt)
+                velocity = velocity + np.multiply(mask, acceleration * dt)
             if verbose:
                 print('angle: ', np.array(angle).flatten(),
                       '\nvelocity: ', np.array(velocity).flatten())
@@ -206,9 +208,12 @@ class Robot(RobotWrapper):
         velocity = to_matrix(velocity)
         torque = to_matrix(torque)
         acceleration = self.forward_dynamics(angle, velocity, torque)
-        angle = angle + velocity * dt
-        velocity = velocity + acceleration * dt
-
+        if self.symplectic:
+            velocity = velocity + acceleration * dt
+            angle = angle + velocity * dt
+        else:
+            angle = angle + velocity * dt
+            velocity = velocity + acceleration * dt
         return angle, velocity
 
     def friction_torque(self, velocity):
