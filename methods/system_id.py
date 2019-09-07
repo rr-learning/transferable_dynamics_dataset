@@ -105,26 +105,20 @@ class SystemId(DynamicsLearnerInterface):
 
             angle = observation_history[i, -1, :3]
             velocity = observation_history[i, -1, 3:6]
-
-            integration_step_ms = 1
-            # for long horizon we increase the
-            # integration step to get a speedup
-            if self.prediction_horizon == 1000:
-                integration_step_ms = 10
-
-            for t in range(0, self.prediction_horizon, integration_step_ms):
+            for t in range(0, self.prediction_horizon,
+                    self.robot.integration_step_ms):
                 torque = np.average(
-                    torques_sequence[t: t + integration_step_ms], axis=0)
+                    torques_sequence[t: t + self.robot.integration_step_ms],
+                    axis=0)
                 angle, velocity = \
                     self.robot.predict(angle=angle,
                                        velocity=velocity,
                                        torque=torque,
-                                       dt=integration_step_ms / 1000.)
+                                       dt=self.robot.integration_step_ms/1000.)
 
             predictions[i] = np.concatenate([np.array(angle).flatten(),
                                              np.array(velocity).flatten(),
                                              torques_sequence[-1]], axis=0)
-
         return predictions
 
     def name(self):
@@ -144,10 +138,12 @@ def to_diagonal_matrix(vector):
 
 
 class Robot(RobotWrapper):
-    def __init__(self, symplectic=True, visualizer=None):
+    def __init__(self, integration_step_ms=1, symplectic=True,
+            visualizer=None):
         self.load_urdf()
         self.viscous_friction = to_matrix(np.zeros(3)) + 0.01
         self.static_friction = to_matrix(np.zeros(3)) + 0.00
+        self.integration_step_ms = integration_step_ms
         self.symplectic = symplectic
         if visualizer == "meshcat":
             self.setVisualizer(MeshcatVisualizer())
