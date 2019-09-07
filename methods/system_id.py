@@ -36,15 +36,18 @@ class SystemId(DynamicsLearnerInterface):
     def __init__(self,
                  history_length,
                  prediction_horizon,
-                 identification_method):
+                 settings=None):
         DynamicsLearnerInterface.__init__(self,
                                           history_length=history_length,
                                           prediction_horizon=prediction_horizon,
                                           difference_learning=False,
                                           averaging=False,
                                           streaming=False)
-        self.robot = Robot()
-        self.identification_method = identification_method
+        if settings is None:
+            settings = {}
+        # TODO: should we have a default value for this attribute.
+        self.identification_method = settings.pop('identification_method', None)
+        self.robot = Robot(**settings)
 
     def learn(self, observation_sequences, action_sequences):
         # preprocess data ------------------------------------------------------
@@ -74,7 +77,7 @@ class SystemId(DynamicsLearnerInterface):
                        acceleration=data['acceleration'],
                        torque=data['torque'])
         else:
-            raise NotImplementedError
+            raise NotImplementedError('Choose an identification method')
 
     def predict(self, observation_history, action_history, action_future=None):
         # parse arguments ------------------------------------------------------
@@ -138,7 +141,7 @@ def to_diagonal_matrix(vector):
 
 
 class Robot(RobotWrapper):
-    def __init__(self, integration_step_ms=1, symplectic=True,
+    def __init__(self, integration_step_ms=1, symplectic=True, init='cad',
             visualizer=None):
         self.load_urdf()
         self.viscous_friction = to_matrix(np.zeros(3)) + 0.01
@@ -150,6 +153,18 @@ class Robot(RobotWrapper):
         elif visualizer == "gepetto":
             self.setVisualizer(GepettoVisualizer())
         elif visualizer:
+            raise NotImplementedError
+
+        # Initialization of Parameters
+        if init == 'cad':
+            pass
+        elif init == 'random':
+            self.set_random_params()
+        elif init == 'noisy':
+            self.set_noisy_params()
+        elif init == 'identity':
+            self.set_identity_params()
+        else:
             raise NotImplementedError
 
     # dynamics -----------------------------------------------------------------
@@ -291,6 +306,22 @@ class Robot(RobotWrapper):
                                n_inertial_params + 3: n_inertial_params + 6]
 
         assert (((self.get_params() - theta) < 1e-9).all())
+
+    def set_random_params(self):
+        for dof in range(self.model.nv):
+            self.model.inertias[dof + 1].setRandom()
+
+    def set_identity_params(self):
+        for dof in range(self.model.nv):
+            self.model.inertias[dof + 1].setIdentity()
+
+    def set_noisy_params(self):
+        sigma = 0.001
+        for dof in range(self.model.nv):
+            self.model.inertias[dof + 1].mass += sigma * np.random.randn()
+            self.model.inertias[dof + 1].lever += sigma * np.random.randn(3, 1)
+            self.model.inertias[dof + 1].inertia += np.abs(np.diag(
+                    sigma * np.random.randn(3)))
 
     # loading ------------------------------------------------------------------
     def load_urdf(self):
