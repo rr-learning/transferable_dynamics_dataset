@@ -686,7 +686,7 @@ def sys_id_lmi_diagonal(robot, angle, velocity, acceleration, torque):
     print('static_friction: ', robot.static_friction, '\n',
           'visous_friction: ', robot.viscous_friction)
 
-    ipdb.set_trace()
+    # ipdb.set_trace()
 
 
 def sys_id(robot, angle, velocity, acceleration, torque):
@@ -879,7 +879,7 @@ def check_inertias():
 
     inertia_matrix = robot.get_inertia_matrix_link_frame(0)
 
-    ipdb.set_trace()
+    # ipdb.set_trace()
 
 
 def save_simulated_data(angles, velocities, torques, filename):
@@ -895,42 +895,36 @@ def save_simulated_data(angles, velocities, torques, filename):
 
 
 if __name__ == '__main__':
-    try:
-        parser = argparse.ArgumentParser(description='system id baseline')
-        parser.add_argument("--input",
-                help="Filename of the input robot data",
-                default='/is/ei/mwuthrich/dataset_v06_sines_full.npz')
-        parser.add_argument("--output",
-                help="Filename to save simulated robot data")
-        parser.add_argument("--visualizer", choices=['meshcat', 'gepetto'])
-        args = parser.parse_args()
-        robot = Robot()
-        print(robot.model.inertias[2])
-        if args.output:
-            assert args.input
-            data = load_data()
-            nseq = data['angle'].shape[0]
-            qs = []
-            qdots = []
-            taus = []
-            for sample_idx in range(nseq):
-                print(sample_idx)
-                q, qdot, tau = robot.simulate(dt=0.001,
-                        torque=data['torque'][sample_idx],
-                        initial_angle=data['angle'][sample_idx, 0],
-                        initial_velocity=data['velocity'][sample_idx, 0])
-                qs.append(np.expand_dims(q, 0))
-                qdots.append(np.expand_dims(qdot, 0))
-                taus.append(np.expand_dims(tau, 0))
-            save_simulated_data(np.vstack(qs), np.vstack(qdots),
-                    np.vstack(taus), args.output)
+    parser = argparse.ArgumentParser(description='system id baseline')
+    parser.add_argument("--input",
+            help="Filename of the input robot data",
+            default='/is/ei/mwuthrich/dataset_v06_sines_full.npz')
+    parser.add_argument("--output",
+            help="Filename to save simulated robot data")
+    parser.add_argument("--visualizer", choices=['meshcat', 'gepetto'])
+    args = parser.parse_args()
+    robot = Robot()
+    print(robot.model.inertias[2])
+    if args.output:
+        assert args.input
+        data = load_data()
+        nseq = data['angle'].shape[0]
+        qs = []
+        qdots = []
+        taus = []
+        for sample_idx in range(nseq):
+            print(sample_idx)
+            q, qdot, tau = robot.simulate(dt=0.001,
+                    torque=data['torque'][sample_idx],
+                    initial_angle=data['angle'][sample_idx, 0],
+                    initial_velocity=data['velocity'][sample_idx, 0])
+            qs.append(np.expand_dims(q, 0))
+            qdots.append(np.expand_dims(qdot, 0))
+            taus.append(np.expand_dims(tau, 0))
+        save_simulated_data(np.vstack(qs), np.vstack(qdots),
+                np.vstack(taus), args.output)
 
-        # check_inertias()
-        # test_sys_id_lmi()
-        # test_sys_id_visually()
-        # test_sys_id_simulated_torques()
-
-    except:
-        _, _, tb = sys.exc_info()
-        traceback.print_exc()
-        ipdb.post_mortem(tb)
+    # check_inertias()
+    # test_sys_id_lmi()
+    # test_sys_id_visually()
+    # test_sys_id_simulated_torques()

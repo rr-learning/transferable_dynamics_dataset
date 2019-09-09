@@ -293,15 +293,14 @@ def run(parser):
 
 
 if __name__ == "__main__":
-    # run(parser=argparse.ArgumentParser(description=__doc__))
+    run(parser=argparse.ArgumentParser(description=__doc__))
 
-
-    import ipdb
-    import traceback
-    try:
-        run(parser=argparse.ArgumentParser(description=__doc__))
-    except:
-        traceback.print_exc(sys.stdout)
-        _, _, tb = sys.exc_info()
-        ipdb.post_mortem(tb)
+    # import ipdb
+    # import traceback
+    # try:
+    #    run(parser=argparse.ArgumentParser(description=__doc__))
+    # except:
+    #     traceback.print_exc(sys.stdout)
+    #     _, _, tb = sys.exc_info()
+    #     ipdb.post_mortem(tb)
 
