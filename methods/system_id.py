@@ -5,6 +5,10 @@ import sys
 import ipdb
 import traceback
 
+
+from collections import OrderedDict 
+
+
 import numpy as np
 import numpy.matlib
 import time
@@ -46,8 +50,12 @@ class SystemId(DynamicsLearnerInterface):
         if settings is None:
             settings = {}
         # TODO: should we have a default value for this attribute.
-        self.identification_method = settings.pop('identification_method', None)
+        self.identification_method = settings.pop(
+            'identification_method', None)
         self.robot = Robot(**settings)
+
+        self.time_steps_per_integration_step = 1
+        self.dt = 0.001
 
     def learn(self, observation_sequences, action_sequences):
         # preprocess data ------------------------------------------------------
@@ -55,7 +63,7 @@ class SystemId(DynamicsLearnerInterface):
         data['angle'] = observation_sequences[:, :, :3]
         data['velocity'] = observation_sequences[:, :, 3:6]
         data['torque'] = action_sequences
-        data = compute_accelerations(data)
+        compute_accelerations(data, self.dt)
         data = preprocess_data(data=data,
                                desired_n_data_points=100000,
                                smoothing_sigma=1.0)
@@ -109,15 +117,16 @@ class SystemId(DynamicsLearnerInterface):
             angle = observation_history[i, -1, :3]
             velocity = observation_history[i, -1, 3:6]
             for t in range(0, self.prediction_horizon,
-                    self.robot.integration_step_ms):
+                           self.time_steps_per_integration_step):
                 torque = np.average(
-                    torques_sequence[t: t + self.robot.integration_step_ms],
+                    torques_sequence[t: t +
+                                     self.time_steps_per_integration_step],
                     axis=0)
                 angle, velocity = \
                     self.robot.predict(angle=angle,
                                        velocity=velocity,
                                        torque=torque,
-                                       dt=self.robot.integration_step_ms/1000.)
+                                       dt=self.time_steps_per_integration_step * self.dt)
 
             predictions[i] = np.concatenate([np.array(angle).flatten(),
                                              np.array(velocity).flatten(),
@@ -141,12 +150,11 @@ def to_diagonal_matrix(vector):
 
 
 class Robot(RobotWrapper):
-    def __init__(self, integration_step_ms=1, symplectic=True, init='cad',
-            visualizer=None):
+    def __init__(self, symplectic=True, init='cad',
+                 visualizer=None):
         self.load_urdf()
         self.viscous_friction = to_matrix(np.zeros(3)) + 0.01
         self.static_friction = to_matrix(np.zeros(3)) + 0.00
-        self.integration_step_ms = integration_step_ms
         self.symplectic = symplectic
         if visualizer == "meshcat":
             self.setVisualizer(MeshcatVisualizer())
@@ -196,12 +204,15 @@ class Robot(RobotWrapper):
         last_time = time.time()
         simulated_angles = []
         simulated_vels = []
+        simulated_accelerations = []
         applied_torques = []
         for t in range(torque.shape[0]):
+            acceleration = self.forward_dynamics(angle, velocity, torque[t])
+
             simulated_angles.append(np.ravel(angle))
             simulated_vels.append(np.ravel(velocity))
+            simulated_accelerations.append(np.ravel(acceleration))
             applied_torques.append(np.ravel(torque[t]))
-            acceleration = self.forward_dynamics(angle, velocity, torque[t])
             if self.symplectic:
                 velocity = velocity + np.multiply(mask, acceleration * dt)
                 angle = angle + np.multiply(mask, velocity * dt)
@@ -211,8 +222,7 @@ class Robot(RobotWrapper):
             if verbose:
                 print('angle: ', np.array(angle).flatten(),
                       '\nvelocity: ', np.array(velocity).flatten())
-        return np.array(simulated_angles), np.array(simulated_vels), \
-                np.array(applied_torques)
+        return np.array(simulated_angles), np.array(simulated_vels), np.array(simulated_accelerations), np.array(applied_torques)
 
     # TODO: this needs to be checked
     def predict(self, angle, velocity, torque, dt):
@@ -263,7 +273,8 @@ class Robot(RobotWrapper):
                                                   to_matrix(acceleration))
 
         viscous_friction_torque_regressor = to_diagonal_matrix(velocity)
-        static_friction_torque_regressor = to_diagonal_matrix(np.sign(velocity))
+        static_friction_torque_regressor = to_diagonal_matrix(
+            np.sign(velocity))
 
         regressor_matrix = np.concatenate([
             joint_torque_regressor,
@@ -303,7 +314,7 @@ class Robot(RobotWrapper):
         n_inertial_params = self.model.nv * 10
         self.viscous_friction = theta[n_inertial_params: n_inertial_params + 3]
         self.static_friction = theta[
-                               n_inertial_params + 3: n_inertial_params + 6]
+            n_inertial_params + 3: n_inertial_params + 6]
 
         assert (((self.get_params() - theta) < 1e-9).all())
 
@@ -321,18 +332,18 @@ class Robot(RobotWrapper):
             self.model.inertias[dof + 1].mass += sigma * np.random.randn()
             self.model.inertias[dof + 1].lever += sigma * np.random.randn(3, 1)
             self.model.inertias[dof + 1].inertia += np.abs(np.diag(
-                    sigma * np.random.randn(3)))
+                sigma * np.random.randn(3)))
 
     # loading ------------------------------------------------------------------
     def load_urdf(self):
         try:
             model_path = rospkg.RosPack().get_path(
-                    "robot_properties_manipulator")
+                "robot_properties_manipulator")
         except rospkg.ResourceNotFound:
             print('Warning: The URDF is not being loaded from a ROS package.')
-            current_path =  str(os.path.dirname(os.path.abspath(__file__)))
-            model_path =  str(os.path.abspath(os.path.join(current_path,
-                '../../robot_properties_manipulator')))
+            current_path = str(os.path.dirname(os.path.abspath(__file__)))
+            model_path = str(os.path.abspath(os.path.join(current_path,
+                                                          '../../robot_properties_manipulator')))
         urdf_path = join(model_path, "urdf", "manipulator.urdf")
         meshes_path = dirname(model_path)
         print(urdf_path, meshes_path)
@@ -364,27 +375,35 @@ def load_data():
     data['torque'] = all_data['measured_torques']
     return data
 
+
 def show_recorded_and_simulated_trajs():
     robot = Robot(visualizer=args.visualizer)
     data = load_data()
     sample_idx = 113
     time_steps = 2000
-    q_trajectory = np.matrix(data['angle'][sample_idx,:time_steps]).transpose()
+    q_trajectory = np.matrix(
+        data['angle'][sample_idx, :time_steps]).transpose()
     robot.initViewer(loadModel=True)
     print("Replay")
     robot.play(q_trajectory=q_trajectory, dt=0.001)
     print("Simulation")
     robot.simulate(dt=0.001,
-                torque=data['torque'][sample_idx, :time_steps],
-                initial_angle=data['angle'][sample_idx, 0],
-                initial_velocity=data['velocity'][sample_idx, 0])
+                   torque=data['torque'][sample_idx, :time_steps],
+                   initial_angle=data['angle'][sample_idx, 0],
+                   initial_velocity=data['velocity'][sample_idx, 0])
 
-def compute_accelerations(data):
-    data['acceleration'] = np.diff(data['velocity'], axis=1)
+
+def compute_accelerations(data, dt):
+    data['acceleration'] = np.diff(data['velocity'], axis=1) / dt
     for key in ['angle', 'velocity', 'torque']:
         data[key] = data[key][:, :-1]
 
-    return data
+    # test that everything worked out -----------------------------------------
+    integrated_velocity = data['velocity'][:, :-1] + \
+        data['acceleration'][:, :-1] * dt
+
+    is_consistent = (np.absolute(integrated_velocity - data['velocity'][:, 1:]) <= 1e-12).all()
+    assert(is_consistent)
 
 
 def preprocess_data(data, desired_n_data_points,
@@ -399,7 +418,7 @@ def preprocess_data(data, desired_n_data_points,
     # cut off ends -------------------------------------------------------------
     for key in data.keys():
         data[key] = data[key][:,
-                    data[key].shape[1] // 10: -data[key].shape[1] // 10]
+                              data[key].shape[1] // 10: -data[key].shape[1] // 10]
 
     # reshape ------------------------------------------------------------------
     ordered_data = data.copy()
@@ -449,8 +468,8 @@ def rmse_sequential(robot, angle, velocity, acceleration, torque):
                                                   velocity=velocity[t],
                                                   acceleration=acceleration[t])
         sum_squared_error = sum_squared_error \
-                            + np.linalg.norm(
-            predicted_torque - to_matrix(torque[t])) ** 2
+            + np.linalg.norm(
+                predicted_torque - to_matrix(torque[t])) ** 2
 
     mean_squared_error = sum_squared_error / T / 3
 
@@ -504,11 +523,8 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
                [theta[10 * i + 5], theta[10 * i + 6], theta[10 * i + 8]],
                [theta[10 * i + 7], theta[10 * i + 8], theta[10 * i + 9]]]
 
-
-
     fr_v = [theta[30], theta[31], theta[32]]
     fr_s = [theta[33], theta[34], theta[35]]
-
 
     J = []
     constraints = []
@@ -540,8 +556,6 @@ def sys_id_lmi(robot, angle, velocity, acceleration, torque):
         constraints += [theta[10 * i + 4] <= 0.005]
         constraints += [theta[10 * i + 6] <= 0.005]
         constraints += [theta[10 * i + 9] <= 0.005]
-
-
 
     mass_indices = [0, 10, 20]
     for i in mass_indices:
@@ -747,7 +761,7 @@ def test_sys_id_simulated_torques():
 
     # create dataset with simulated torques ------------------------------------
     data = load_data()
-    data = compute_accelerations(data)
+    compute_accelerations(data, dt=0.001)
 
     for key in data.keys():
         data[key] = data[key][:, 10000: 10200]
@@ -791,7 +805,7 @@ def test_sys_id_visually():
     # robot.simulate(dt=0.001, n_steps=10000)
 
     data = load_data()
-    data = compute_accelerations(data)
+    compute_accelerations(data, dt=0.001)
 
     # # plot ---------------------------------------------------------------------
     # for key in data.keys():
@@ -838,7 +852,7 @@ def test_sys_id_lmi():
     # robot.simulate(dt=0.001, n_steps=10000)
 
     data = load_data()
-    data = compute_accelerations(data)
+    compute_accelerations(data, dt=0.001)
 
     # # plot ---------------------------------------------------------------------
     # for key in data.keys():
@@ -894,13 +908,41 @@ def save_simulated_data(angles, velocities, torques, filename):
     np.savez(filename, **data_dict)
 
 
+def test_numeric_differentiation():
+    dt = 0.001
+    robot = Robot()
+
+    data = {}
+    data['angle'], data['velocity'], data['acceleration'], data['torque'] = robot.simulate(
+        dt=dt, n_steps=10000)
+
+    for key in data.keys():
+        data[key] = np.expand_dims(data[key], axis=0)
+
+    data_copy = data.copy()
+    compute_accelerations(data_copy, dt=dt)
+
+    for key in data.keys():
+        difference = data[key][:,:-1] - data_copy[key]
+        assert((np.absolute(difference) < 1e-12).all())
+
+
+# if __name__ == '__main__':
+#     try:
+#         test_numeric_differentiation()
+#     except:
+#         extype, value, tb = sys.exc_info()
+#         traceback.print_exc()
+#         ipdb.post_mortem(tb)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='system id baseline')
     parser.add_argument("--input",
-            help="Filename of the input robot data",
-            default='/is/ei/mwuthrich/dataset_v06_sines_full.npz')
+                        help="Filename of the input robot data",
+                        default='/is/ei/mwuthrich/dataset_v06_sines_full.npz')
     parser.add_argument("--output",
-            help="Filename to save simulated robot data")
+                        help="Filename to save simulated robot data")
     parser.add_argument("--visualizer", choices=['meshcat', 'gepetto'])
     args = parser.parse_args()
     robot = Robot()
@@ -915,14 +957,14 @@ if __name__ == '__main__':
         for sample_idx in range(nseq):
             print(sample_idx)
             q, qdot, tau = robot.simulate(dt=0.001,
-                    torque=data['torque'][sample_idx],
-                    initial_angle=data['angle'][sample_idx, 0],
-                    initial_velocity=data['velocity'][sample_idx, 0])
+                                          torque=data['torque'][sample_idx],
+                                          initial_angle=data['angle'][sample_idx, 0],
+                                          initial_velocity=data['velocity'][sample_idx, 0])
             qs.append(np.expand_dims(q, 0))
             qdots.append(np.expand_dims(qdot, 0))
             taus.append(np.expand_dims(tau, 0))
         save_simulated_data(np.vstack(qs), np.vstack(qdots),
-                np.vstack(taus), args.output)
+                            np.vstack(taus), args.output)
 
     # check_inertias()
     # test_sys_id_lmi()
