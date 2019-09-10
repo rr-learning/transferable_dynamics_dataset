@@ -2,8 +2,6 @@ from __future__ import print_function
 
 import argparse
 import sys
-import ipdb
-import traceback
 
 
 from collections import OrderedDict 
@@ -730,7 +728,8 @@ def sys_id(robot, angle, velocity, acceleration, torque):
 
     robot.set_params(theta)
 
-    assert (satisfies_normal_equation(robot.get_params(), Y, T))
+    # TODO: include the regularization in the normal equation assertion.
+    # assert (satisfies_normal_equation(robot.get_params(), Y, T))
     test_regressor_matrix(robot)
 
     log['rmse_sequential_after_id'] = rmse_sequential(robot=robot,

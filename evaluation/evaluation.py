@@ -8,7 +8,6 @@ import numpy as np
 import time
 
 import sys
-import ipdb
 
 from DL.dynamics_learner_interface.dynamics_learner_interface import DynamicsLearnerExample
 from DL.utils import Standardizer
@@ -270,7 +269,7 @@ def run(parser):
     if arguments.transfer_test_data:
         for i, dataset_path in enumerate(arguments.transfer_test_data):
             datasets['transfer_test_data_{}'.format(i + 1)] = dataset_path
-    for dataset in ['training_data', 'iid_test_data', 'validation_data']:
+    for dataset in ['iid_test_data']:
         dataset_path = getattr(arguments, dataset)
         if dataset_path:
             datasets[dataset] = dataset_path
