@@ -376,21 +376,10 @@ def load_data():
     return data
 
 
-def show_recorded_and_simulated_trajs():
+def show_angle_trajectory(q_trajectory, dt=0.001):
     robot = Robot(visualizer=args.visualizer)
-    data = load_data()
-    sample_idx = 113
-    time_steps = 2000
-    q_trajectory = np.matrix(
-        data['angle'][sample_idx, :time_steps]).transpose()
     robot.initViewer(loadModel=True)
-    print("Replay")
     robot.play(q_trajectory=q_trajectory, dt=0.001)
-    print("Simulation")
-    robot.simulate(dt=0.001,
-                   torque=data['torque'][sample_idx, :time_steps],
-                   initial_angle=data['angle'][sample_idx, 0],
-                   initial_velocity=data['velocity'][sample_idx, 0])
 
 
 def compute_accelerations(data, dt):
@@ -947,6 +936,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     robot = Robot()
     print(robot.model.inertias[2])
+    if args.visualizer:
+        data = load_data()
+        sample_idx = 113
+        time_steps = 2000
+        q_trajectory = np.matrix(data['angle'][sample_idx, :time_steps]).T
+        show_angle_trajectory(q_trajectory)
     if args.output:
         assert args.input
         data = load_data()
