@@ -927,9 +927,7 @@ def test_numeric_differentiation():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='system id baseline')
-    parser.add_argument("--input",
-                        help="Filename of the input robot data",
-                        default='/is/ei/mwuthrich/dataset_v06_sines_full.npz')
+    parser.add_argument("--input", help="Filename of the input robot data")
     parser.add_argument("--output",
                         help="Filename to save simulated robot data")
     parser.add_argument("--visualizer", choices=['meshcat', 'gepetto'])
@@ -937,10 +935,22 @@ if __name__ == '__main__':
     robot = Robot()
     print(robot.model.inertias[2])
     if args.visualizer:
-        data = load_data()
-        sample_idx = 113
-        time_steps = 2000
-        q_trajectory = np.matrix(data['angle'][sample_idx, :time_steps]).T
+        if args.input:
+            data = load_data()
+
+            # Playing the first recorded angle trajectory.
+            q_trajectory = np.matrix(data['angle'][0]).T
+        else:
+
+            # Playing artificial angle trajectory. Each degree of freedom is
+            # linearly increased from 0 to PI independently.
+            nsteps = 1000
+            linear= np.linspace(0, np.pi, nsteps)
+            zeros = np.zeros(nsteps)
+            q_trajectory = np.block([[linear, zeros, zeros],
+                                     [zeros, linear, zeros],
+                                     [zeros, zeros, linear]])
+            q_trajectory = np.matrix(q_trajectory)
         show_angle_trajectory(q_trajectory)
     if args.output:
         assert args.input
