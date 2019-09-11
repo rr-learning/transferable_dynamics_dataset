@@ -95,13 +95,9 @@ def path_to_error_file(method_name,
             get_diego_index(prediction_horizon=prediction_horizon,
                             history_length=history_length,
                             averaging=True))
-    elif method_name in ['sys id cad', 'sys id ls', 'sys id ls-lmi']:
-        identification_method = method_name[7:]
-        error_file_name = 'system_id/system_id__' + experiment_name + \
-                          '__horizon_' + str(prediction_horizon).zfill(4) + \
-                          '__history_' + str(history_length).zfill(2) + \
-                          '__identification_method_' + identification_method + \
-                          '.npz'
+    elif method_name in ['system_id_cad', 'system_id_ls', 'system_id_ls_lmi']:
+        error_file_name = '{0}/errors_sine_pd_{0}_{1:03d}.npz'.format(
+                method_name, int(np.log10(prediction_horizon)))
     elif bool(re.compile("NN_lr_0.0001_reg_0.0001_l_[0-9]_w_[0-9]+").match(method_name)):
         pattern2 = re.compile("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?")
         (lr, reg, num_layers, num_units) = [float(name) for name in pattern2.findall(method_name)]
