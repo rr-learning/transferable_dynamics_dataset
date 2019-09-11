@@ -52,7 +52,6 @@ class SystemId(DynamicsLearnerInterface):
             'identification_method', None)
         self.robot = Robot(**settings)
 
-        self.time_steps_per_integration_step = 1
         self.dt = 0.001
 
     def learn(self, observation_sequences, action_sequences):
@@ -96,13 +95,6 @@ class SystemId(DynamicsLearnerInterface):
 
         assert (action_future.shape[1] == self.prediction_horizon - 1)
 
-        # we smoothen velocities -----------------------------------------------
-        temp = observation_history.copy()
-        observation_history[..., 3:6] = gaussian_filter1d(
-            observation_history[..., 3:6],
-            sigma=2,
-            axis=1)
-
         # make predictions -----------------------------------------------------
         predictions = np.empty((n_samples, dim_observation))
         predictions[:] = numpy.nan
@@ -114,17 +106,12 @@ class SystemId(DynamicsLearnerInterface):
 
             angle = observation_history[i, -1, :3]
             velocity = observation_history[i, -1, 3:6]
-            for t in range(0, self.prediction_horizon,
-                           self.time_steps_per_integration_step):
-                torque = np.average(
-                    torques_sequence[t: t +
-                                     self.time_steps_per_integration_step],
-                    axis=0)
+            for t in range(0, self.prediction_horizon):
                 angle, velocity = \
                     self.robot.predict(angle=angle,
                                        velocity=velocity,
-                                       torque=torque,
-                                       dt=self.time_steps_per_integration_step * self.dt)
+                                       torque=torques_sequence[t],
+                                       dt=self.dt)
 
             predictions[i] = np.concatenate([np.array(angle).flatten(),
                                              np.array(velocity).flatten(),
