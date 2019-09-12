@@ -4,7 +4,7 @@ import argparse
 import sys
 
 
-from collections import OrderedDict 
+from collections import OrderedDict
 
 
 import numpy as np
@@ -280,10 +280,10 @@ class Robot(RobotWrapper):
         return theta
 
     def get_com(self, link_index):
-        raise NotImplementedError
+        raise self.model.inertias[link_index + 1].lever
 
     def get_mass(self, link_index):
-        raise NotImplementedError
+        return self.model.inertias[link_index + 1].mass
 
     def get_inertia_matrix_link_frame(self, link_index):
         return np.array(self.model.inertias[link_index + 1].inertia)
@@ -352,6 +352,7 @@ def test_regressor_matrix(robot):
 
 
 def load_data():
+    # TODO: please don't use global variables (args)
     all_data = np.load(args.input)
     data = dict()
     data['angle'] = all_data['measured_angles']
@@ -363,6 +364,8 @@ def load_data():
 
 
 def show_angle_trajectory(q_trajectory, dt=0.001):
+    # TODO: please don't use global variables (args)
+
     robot = Robot(visualizer=args.visualizer)
     robot.initViewer(loadModel=True)
     robot.play(q_trajectory=q_trajectory, dt=0.001)
@@ -377,7 +380,8 @@ def compute_accelerations(data, dt):
     integrated_velocity = data['velocity'][:, :-1] + \
         data['acceleration'][:, :-1] * dt
 
-    is_consistent = (np.absolute(integrated_velocity - data['velocity'][:, 1:]) <= 1e-12).all()
+    is_consistent = (np.absolute(integrated_velocity -
+                                 data['velocity'][:, 1:]) <= 1e-12).all()
     assert(is_consistent)
 
 
@@ -730,6 +734,8 @@ def sys_id(robot, angle, velocity, acceleration, torque):
     for key in log.keys():
         print(key + ': ', log[key], '\n')
 
+    ipdb.set_trace()
+
 
 def test_sys_id_simulated_torques():
     robot = Robot()
@@ -899,13 +905,55 @@ def test_numeric_differentiation():
     compute_accelerations(data_copy, dt=dt)
 
     for key in data.keys():
-        difference = data[key][:,:-1] - data_copy[key]
+        difference = data[key][:, :-1] - data_copy[key]
         assert((np.absolute(difference) < 1e-12).all())
 
 
 # if __name__ == '__main__':
 #     try:
 #         test_numeric_differentiation()
+#     except:
+#         extype, value, tb = sys.exc_info()
+#         traceback.print_exc()
+#         ipdb.post_mortem(tb)
+
+
+def nother_test():
+    dt = 0.001
+    robot = Robot(visualizer='meshcat')
+    robot.initViewer(loadModel=True)
+
+    data_file = np.load(
+        '/agbs/dynlearning/Data/dataset_v06_sines_training.npz')
+
+    # preprocess data ------------------------------------------------------
+    data = dict()
+    data['angle'] = data_file['measured_angles']
+    data['velocity'] = data_file['measured_velocities']
+    data['torque'] = data_file['measured_torques']
+
+    robot.play(np.matrix(data['angle'][0].transpose()), dt)
+
+    compute_accelerations(data, dt)
+    data = preprocess_data(data=data,
+                           desired_n_data_points=100000,
+                           smoothing_sigma=1.0)
+    print('Learning with {} points'.format(data['angle'].shape[0]))
+
+    # identify -------------------------------------------------------------
+    sys_id_lmi(robot=robot,
+               angle=data['angle'],
+               velocity=data['velocity'],
+               acceleration=data['acceleration'],
+               torque=data['torque'])
+
+
+# if __name__ == '__main__':
+#     import ipdb
+#     import traceback
+
+#     try:
+#         nother_test()
 #     except:
 #         extype, value, tb = sys.exc_info()
 #         traceback.print_exc()
@@ -932,7 +980,7 @@ if __name__ == '__main__':
             # Playing artificial angle trajectory. Each degree of freedom is
             # linearly increased from 0 to PI independently.
             nsteps = 1000
-            linear= np.linspace(0, np.pi, nsteps)
+            linear = np.linspace(0, np.pi, nsteps)
             zeros = np.zeros(nsteps)
             q_trajectory = np.block([[linear, zeros, zeros],
                                      [zeros, linear, zeros],
