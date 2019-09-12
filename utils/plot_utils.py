@@ -51,8 +51,10 @@ def path_to_error_file(method_name,
                        experiment_name,
                        prediction_horizon,
                        history_length):
-    if experiment_name == 'sine':
+    if experiment_name == 'sine_pd':
         path_to_results = "/agbs/dynlearning/Errors/new_datasets/SinePD/"
+    elif experiment_name == 'sim':
+        path_to_results = "/agbs/dynlearning/Errors/simulated_data"
     else:
         raise NotImplementedError
 
@@ -69,35 +71,38 @@ def path_to_error_file(method_name,
                           "_{}_epochs_20/errors.npz".format(prediction_horizon,
                                                             history_length)
     elif method_name == 'delta 0':
-        error_file_name = 'delta_0/errors_sine_pd_delta_0_{:03d}.npz'.format(
-            get_diego_index(prediction_horizon=prediction_horizon,
-                            history_length=history_length,
-                            averaging=False))
+        error_file_name = 'delta_0/errors_{}_delta_0_{:03d}.npz'.format(
+                experiment_name,
+                get_diego_index(prediction_horizon=prediction_horizon,
+                history_length=history_length,
+                averaging=False))
     elif method_name == 'svgpr':
-        error_file_name = 'svgpr/errors_sine_pd_svgpr_{:03d}.npz'.format(
-            get_diego_index(prediction_horizon=prediction_horizon,
-                            history_length=history_length,
-                            averaging=False))
+        error_file_name = 'svgpr/errors_{}_svgpr_{:03d}.npz'.format(
+                experiment_name,
+                get_diego_index(prediction_horizon=prediction_horizon,
+                history_length=history_length,
+                averaging=False))
     elif method_name == 'avg-svgpr':
-        error_file_name = 'svgpr/errors_sine_pd_svgpr_{:03d}.npz'.format(
-            get_diego_index(prediction_horizon=prediction_horizon,
-                            history_length=history_length,
-                            averaging=True))
+        error_file_name = 'svgpr/errors_{}_svgpr_{:03d}.npz'.format(
+                experiment_name,
+                get_diego_index(prediction_horizon=prediction_horizon,
+                history_length=history_length,
+                averaging=True))
     elif method_name == 'linear':
-        error_file_name = 'linear_model_learning_rate_0.0001/errors_sine' \
-                          '_pd_linear_model_{:03d}.npz'.format(
-            get_diego_index(prediction_horizon=prediction_horizon,
-                            history_length=history_length,
-                            averaging=False))
+        error_file_name = 'linear_model_learning_rate_0.0001/errors_{}' \
+                '_linear_model_{:03d}.npz'.format(experiment_name,
+                get_diego_index(prediction_horizon=prediction_horizon,
+                history_length=history_length,
+                averaging=False))
     elif method_name == 'avg-linear':
-        error_file_name = 'linear_model_learning_rate_0.0001/errors_sine' \
-                          '_pd_linear_model_{:03d}.npz'.format(
-            get_diego_index(prediction_horizon=prediction_horizon,
-                            history_length=history_length,
-                            averaging=True))
+        error_file_name = 'linear_model_learning_rate_0.0001/errors_{}' \
+                '_linear_model_{:03d}.npz'.format(experiment_name,
+                get_diego_index(prediction_horizon=prediction_horizon,
+                history_length=history_length,
+                averaging=True))
     elif method_name in ['system_id_cad', 'system_id_ls', 'system_id_ls_lmi']:
-        error_file_name = '{0}/errors_sine_pd_{0}_{1:03d}.npz'.format(
-                method_name, int(np.log10(prediction_horizon)))
+        error_file_name = '{0}/errors_{2}_{0}_{1:03d}.npz'.format(
+                method_name, int(np.log10(prediction_horizon)), experiment_name)
     elif bool(re.compile("NN_lr_0.0001_reg_0.0001_l_[0-9]_w_[0-9]+").match(method_name)):
         pattern2 = re.compile("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?")
         (lr, reg, num_layers, num_units) = [float(name) for name in pattern2.findall(method_name)]
@@ -106,11 +111,7 @@ def path_to_error_file(method_name,
     else:
         print(method_name)
         assert (False)
-
     return os.path.join(path_to_results, error_file_name)
-
-
-
 
 
 def aggregate_RMSE(experiment_name,
