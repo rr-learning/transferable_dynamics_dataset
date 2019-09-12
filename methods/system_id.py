@@ -186,7 +186,6 @@ class Robot(RobotWrapper):
             zero if initial_velocity is None else to_matrix(initial_velocity)
         mask = to_matrix(mask)
 
-        last_time = time.time()
         simulated_angles = []
         simulated_vels = []
         simulated_accelerations = []
@@ -209,7 +208,6 @@ class Robot(RobotWrapper):
                       '\nvelocity: ', np.array(velocity).flatten())
         return np.array(simulated_angles), np.array(simulated_vels), np.array(simulated_accelerations), np.array(applied_torques)
 
-    # TODO: this needs to be checked
     def predict(self, angle, velocity, torque, dt):
         angle = to_matrix(angle)
         velocity = to_matrix(velocity)
@@ -244,9 +242,9 @@ class Robot(RobotWrapper):
 
         # TODO: Figure out why this fails some times.
         # just as a sanity check -----------------------------------------------
-        # Y = self.compute_regressor_matrix(angle, velocity, acceleration)
-        # actuator_torque_1 = Y * self.get_params()
-        # assert ((abs(actuator_torque - actuator_torque_1) <= 1e-9).all())
+        Y = self.compute_regressor_matrix(angle, velocity, acceleration)
+        actuator_torque_1 = Y * self.get_params()
+        assert ((abs(actuator_torque - actuator_torque_1) <= 1e-9).all())
         # ----------------------------------------------------------------------
 
         return actuator_torque
@@ -679,8 +677,6 @@ def sys_id_lmi_diagonal(robot, angle, velocity, acceleration, torque):
     print('static_friction: ', robot.static_friction, '\n',
           'visous_friction: ', robot.viscous_friction)
 
-    # ipdb.set_trace()
-
 
 def sys_id(robot, angle, velocity, acceleration, torque):
     log = dict()
@@ -716,7 +712,6 @@ def sys_id(robot, angle, velocity, acceleration, torque):
     # for key in log.keys():
     #     print(key + ': ', log[key], '\n')
 
-    # ipdb.set_trace()
 
     robot.set_params(theta)
 
@@ -734,148 +729,6 @@ def sys_id(robot, angle, velocity, acceleration, torque):
     for key in log.keys():
         print(key + ': ', log[key], '\n')
 
-    ipdb.set_trace()
-
-
-def test_sys_id_simulated_torques():
-    robot = Robot()
-    test_regressor_matrix(robot)
-
-    # create dataset with simulated torques ------------------------------------
-    data = load_data()
-    compute_accelerations(data, dt=0.001)
-
-    for key in data.keys():
-        data[key] = data[key][:, 10000: 10200]
-
-    data['torque'] = [[robot.inverse_dynamics(
-        angle=data['angle'][trajectory_idx, t],
-        velocity=data['velocity'][trajectory_idx, t],
-        acceleration=data['acceleration'][trajectory_idx, t])
-        for t in range(data['angle'].shape[1])]
-        for trajectory_idx in range(data['angle'].shape[0])]
-    data['torque'] = np.array(data['torque']).squeeze()
-
-    # the usual preprocessing --------------------------------------------------
-    data = preprocess_data(data=data,
-                           desired_n_data_points=10000,
-                           smoothing_sigma=None)
-
-    # identify -----------------------------------------------------------------
-    sys_id(robot=robot,
-           angle=data['angle'],
-           velocity=data['velocity'],
-           acceleration=data['acceleration'],
-           torque=data['torque'])
-
-    assert (rmse_sequential(robot=robot,
-                            angle=data['angle'],
-                            velocity=data['velocity'],
-                            acceleration=data['acceleration'],
-                            torque=data['torque']) < 1e-10)
-
-
-def test_sys_id_visually():
-    assert args.visualizer
-    robot = Robot(visualizer=args.visualizer)
-    robot.simulate(dt=0.001,
-                   n_steps=1000,
-                   torque=[0.1, 0.1, 0.1],
-                   initial_angle=[1, 1, 1],
-                   mask=[1, 1, 1])
-
-    # robot.simulate(dt=0.001, n_steps=10000)
-
-    data = load_data()
-    compute_accelerations(data, dt=0.001)
-
-    # # plot ---------------------------------------------------------------------
-    # for key in data.keys():
-    #     data[key] = gaussian_filter1d(data[key],
-    #                                   sigma=3,
-    #                                   axis=1)
-    #
-    #
-    # dim = 2
-    # sample = 50
-    # data['velocity'] /= 20
-    # stuff = ['torque', 'acceleration', 'velocity']
-    # for key in stuff:
-    #     plt.plot(data[key][sample, 1000:2000, dim])
-    #
-    # plt.legend(stuff)
-    #
-    # # plt.ylim([-10, 10])
-    #
-    # plt.show()
-    # ipdb.set_trace()
-
-    data = preprocess_data(data=data,
-                           desired_n_data_points=10000,
-                           smoothing_sigma=1)
-
-    sys_id(robot=robot,
-           angle=data['angle'],
-           velocity=data['velocity'],
-           acceleration=data['acceleration'],
-           torque=data['torque'])
-
-    # robot.simulate(dt=0.001, n_steps=10000)
-
-
-def test_sys_id_lmi():
-    robot = Robot()
-    # robot.simulate(dt=0.001,
-    #                n_steps=1000,
-    #                torque=[0.1, 0.1, 0.1],
-    #                initial_angle=[1, 1, 1],
-    #                mask=[1, 1, 1])
-
-    # robot.simulate(dt=0.001, n_steps=10000)
-
-    data = load_data()
-    compute_accelerations(data, dt=0.001)
-
-    # # plot ---------------------------------------------------------------------
-    # for key in data.keys():
-    #     data[key] = gaussian_filter1d(data[key],
-    #                                   sigma=3,
-    #                                   axis=1)
-    #
-    #
-    # dim = 2
-    # sample = 50
-    # data['velocity'] /= 20
-    # stuff = ['torque', 'acceleration', 'velocity']
-    # for key in stuff:
-    #     plt.plot(data[key][sample, 1000:2000, dim])
-    #
-    # plt.legend(stuff)
-    #
-    # # plt.ylim([-10, 10])
-    #
-    # plt.show()
-    # ipdb.set_trace()
-
-    data = preprocess_data(data=data,
-                           desired_n_data_points=10000,
-                           smoothing_sigma=1)
-
-    sys_id_lmi(robot=robot,
-               angle=data['angle'],
-               velocity=data['velocity'],
-               acceleration=data['acceleration'],
-               torque=data['torque'])
-
-    # robot.simulate(dt=0.001, n_steps=10000)
-
-
-def check_inertias():
-    robot = Robot()
-
-    inertia_matrix = robot.get_inertia_matrix_link_frame(0)
-
-    # ipdb.set_trace()
 
 
 def save_simulated_data(angles, velocities, torques, filename):
@@ -909,55 +762,6 @@ def test_numeric_differentiation():
         assert((np.absolute(difference) < 1e-12).all())
 
 
-# if __name__ == '__main__':
-#     try:
-#         test_numeric_differentiation()
-#     except:
-#         extype, value, tb = sys.exc_info()
-#         traceback.print_exc()
-#         ipdb.post_mortem(tb)
-
-
-def nother_test():
-    dt = 0.001
-    robot = Robot(visualizer='meshcat')
-    robot.initViewer(loadModel=True)
-
-    data_file = np.load(
-        '/agbs/dynlearning/Data/dataset_v06_sines_training.npz')
-
-    # preprocess data ------------------------------------------------------
-    data = dict()
-    data['angle'] = data_file['measured_angles']
-    data['velocity'] = data_file['measured_velocities']
-    data['torque'] = data_file['measured_torques']
-
-    robot.play(np.matrix(data['angle'][0].transpose()), dt)
-
-    compute_accelerations(data, dt)
-    data = preprocess_data(data=data,
-                           desired_n_data_points=100000,
-                           smoothing_sigma=1.0)
-    print('Learning with {} points'.format(data['angle'].shape[0]))
-
-    # identify -------------------------------------------------------------
-    sys_id_lmi(robot=robot,
-               angle=data['angle'],
-               velocity=data['velocity'],
-               acceleration=data['acceleration'],
-               torque=data['torque'])
-
-
-# if __name__ == '__main__':
-#     import ipdb
-#     import traceback
-
-#     try:
-#         nother_test()
-#     except:
-#         extype, value, tb = sys.exc_info()
-#         traceback.print_exc()
-#         ipdb.post_mortem(tb)
 
 
 if __name__ == '__main__':
