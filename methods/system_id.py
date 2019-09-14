@@ -208,7 +208,8 @@ class Robot(RobotWrapper):
             if verbose:
                 print('angle: ', np.array(angle).flatten(),
                       '\nvelocity: ', np.array(velocity).flatten())
-        return np.array(simulated_angles), np.array(simulated_vels), np.array(simulated_accelerations), np.array(applied_torques)
+        return np.array(simulated_angles), np.array(simulated_vels), \
+                np.array(simulated_accelerations), np.array(applied_torques)
 
     def predict(self, angle, velocity, torque, dt):
         angle = to_matrix(angle)
@@ -699,6 +700,7 @@ if __name__ == '__main__':
     parser.add_argument("--output",
                         help="Filename to save simulated robot data")
     parser.add_argument("--visualizer", choices=['meshcat', 'gepetto'])
+    parser.add_argument("--noise", type=float)
     args = parser.parse_args()
     robot = Robot()
     print(robot.model.inertias[2])
@@ -729,12 +731,24 @@ if __name__ == '__main__':
         taus = []
         for sample_idx in range(nseq):
             print(sample_idx)
-            q, qdot, tau = robot.simulate(dt=0.001,
-                                          torque=data['torque'][sample_idx],
-                                          initial_angle=data['angle'][sample_idx, 0],
-                                          initial_velocity=data['velocity'][sample_idx, 0])
+            q, qdot, _, tau = robot.simulate(dt=0.001,
+                    torque=data['torque'][sample_idx],
+                    initial_angle=data['angle'][sample_idx, 0],
+                    initial_velocity=data['velocity'][sample_idx, 0])
             qs.append(np.expand_dims(q, 0))
             qdots.append(np.expand_dims(qdot, 0))
             taus.append(np.expand_dims(tau, 0))
-        save_simulated_data(np.vstack(qs), np.vstack(qdots),
-                            np.vstack(taus), args.output)
+
+        qs = np.vstack(qs)
+        qdots = np.vstack(qdots)
+        taus = np.vstack(taus)
+        if args.noise:
+            qs = qs + args.noise * np.random.randn(*qs.shape)
+            qdots = qdots + args.noise * np.random.randn(*qdots.shape)
+            taus = taus + args.noise * np.random.randn(*taus.shape)
+        save_simulated_data(qs, qdots, taus, args.output)
+
+    # check_inertias()
+    # test_sys_id_lmi()
+    # test_sys_id_visually()
+    # test_sys_id_simulated_torques()
