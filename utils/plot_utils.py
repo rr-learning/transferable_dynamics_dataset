@@ -55,6 +55,8 @@ def path_to_error_file(method_name,
         path_to_results = "/agbs/dynlearning/Errors/new_datasets/SinePD/"
     elif experiment_name == 'sim':
         path_to_results = "/agbs/dynlearning/Errors/simulated_data"
+    elif experiment_name == 'sim_noisy':
+        path_to_results = "/agbs/dynlearning/Errors/simulated_noisy_data"
     else:
         raise NotImplementedError
 
