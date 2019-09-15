@@ -578,7 +578,7 @@ def check_and_log(log, robot, angle, velocity, acceleration, torque, Y, T, suffi
         inertia = robot.get_inertia_about_com(i)
         eigenvalues, eigenvectors = np.linalg.eig(inertia)
         reconstruction = eigenvectors.dot(np.diag(eigenvalues)).dot(eigenvectors.transpose())
-        assert(np.allclose(reconstruction, inertia, atol=1e-6))
+        assert(np.allclose(reconstruction, inertia, atol=1e-5))
         assert(np.allclose(eigenvectors.dot(eigenvectors.transpose()), np.identity(3), atol=1e-6))
 
         log['params ' + suffix] = np.array(robot.get_params()).flatten()
