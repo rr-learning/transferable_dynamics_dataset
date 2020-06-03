@@ -21,6 +21,10 @@ This dataset was generated using a superposition of sine waves to generate traje
 <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/1.gif" width="435"/><img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/3.gif" width="435"/>
 <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/2.gif" width="435"/><img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/4.gif" width="435"/>
 
+<p align="center">
+  <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/datasets_closed_loop.png"/>
+</p>
+
 ### Open-loop dataset - GP torque controls
 
 We used sampled trajectories from a Gaussian process (GP) directly as torque inputs (controls) to record this dataset in an open loop fashion. Please refer to the paper for details.
