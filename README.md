@@ -16,7 +16,10 @@ We use the aforementioned robotic platform to record different datasets under su
 
 ### Closed-loop dataset - Sine waves PD control
 
-This dataset was generated using a superposition of sine waves to generate trajectories that were subsequently tracked by the robot using PD position control. Please refer to the paper for details.
+This dataset was generated using a superposition of sine waves to generate trajectories that were subsequently tracked by the robot using PD position control (Please refer to the paper for details). Some sampled robot movements under the 4 different families of controllers considered in the closed-loop dataset:
+
+<img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/1.gif" width="435"/><img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/3.gif" width="435"/>
+<img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/2.gif" width="435"/><img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/4.gif" width="435"/>
 
 ### Open-loop dataset - GP torque controls
 
