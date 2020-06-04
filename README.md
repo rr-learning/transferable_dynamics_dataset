@@ -61,6 +61,31 @@ Each of these keys is associated with a numpy array of shape `(S, T, D)`, where 
 
 We also provide a simulated version of the closed-loop dataset. We keep the naming convention consistent with the real datasets but use the prefix `Sim_Sines` instead.
 
+## Evaluation.
+
+Our evaluation protocol consists of two stages. First, we compute the error vectors of a particular method over different datasets and save them in a single `.npz` file. After we compute the error files corresponding to all benchmarked methods we aggregate the results in different plots as shown in the paper, which we refer to for further details.
+
+### Computing error vectors
+
+As an example the following command computes the aforementioned error file for a linear model trained with SGD:
+
+```
+python -m DL.evaluation.evaluation \
+--method linear_model_sgd \
+--training_data Sines_training.npz \
+--validation_data Sines_validation.npz \
+--iid_test_data Sines_test_iid.npz \
+--transfer_test_data Sines_test_transfer_1.npz Sines_test_transfer_2.npz Sines_test_transfer_3.npz \
+--prediction_horizon 1 \
+--history_length 1 \
+--no-averaging \
+--streaming \
+--verbose \
+--output_errors errors.npz
+```
+
+Among the implemented methods we have `SVGPR`, `system_id`, `NN`, etc.
+
 ## Paper & Reference
 
 [Preprint.](https://www.is.mpg.de/uploads_file/attachment/attachment/589/ICRA20_1157_FI.pdf)
