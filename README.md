@@ -61,7 +61,10 @@ Each of these keys is associated with a numpy array of shape `(S, T, D)`, where 
 
 TODO
 
-## Reference
+## Paper & Reference
+
+[Preprint.](https://www.is.mpg.de/uploads_file/attachment/attachment/589/ICRA20_1157_FI.pdf)
+
 
 In order to cite us please do so according to:
 ```
