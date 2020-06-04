@@ -8,7 +8,7 @@ The data was recorded on a 3-DOF torque-controlled real-robotic system. Please c
 
 <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/16.png" width="418"/> <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/5.png" width="418"/>
 
-## Robotic Dataset
+## Robotic dataset
 
 All the dataset files can be downloaded from [here](https://owncloud.tuebingen.mpg.de/index.php/s/3THSfyBgFrYykPc?path=%2F)
 
@@ -57,9 +57,9 @@ Each of the released `npz` files can be indexed by the following keywords which 
 
 Each of these keys is associated with a numpy array of shape `(S, T, D)`, where `S` denotes the number of sequences/rollouts, and `T`, `D` are the sequence length and number of degrees of freedom, respectively. We recorded at a frequency of 1 Hz, meaning that the time elapsed between consecutive observations is 0.001 seconds. We recorded using a 3-DOF finger robot (`D=3`), and all rollouts have a total duration of 14s (`T=14000`).
 
-## Simulated Dataset
+### Simulated closed-loop dataset
 
-TODO
+We also provide a simulated version of the closed-loop dataset. We keep the naming convention consistent with the real datasets but use the prefix `Sim_Sines` instead.
 
 ## Paper & Reference
 
