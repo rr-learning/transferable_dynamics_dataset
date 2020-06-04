@@ -21,6 +21,8 @@ This dataset was generated using a superposition of sine waves to generate traje
 <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/1.gif" width="435"/><img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/3.gif" width="435"/>
 <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/2.gif" width="435"/><img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/4.gif" width="435"/>
 
+The shown movements are arranged according to the following diagram where each of the datasets *D* account for a particular configuration of sine angular frenquencies (low, high) and reachable task space (left, full). The arrows denote different transfer settings, which are discussed in our paper.
+
 <p align="center">
   <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/datasets_closed_loop.png"/>
 </p>
