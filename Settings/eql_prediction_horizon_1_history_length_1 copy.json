@@ -1,0 +1,38 @@
+{
+    "averaging": true,
+    "history_length": 1,
+    "id": 88,
+    "iid_test_data": "./Dataset/dataset_v06_sines_test_iid.npz",
+    "mode": "train",
+    "model_arch_params": {
+        "layer_width": 10,
+        "num_h_layers": 2
+    },
+    "model_dir": "./Results/EQL",
+    "model_train_params": {
+        "L0_beta": 0.66,
+        "batch_size": 20,
+        "beta1": 0.4,
+        "epochs_first_reg": 20,
+        "epochs_per_reg": 20,
+        "evaluate_every": 20,
+        "learning_rate": 0.001,
+        "reg_scales": [
+            1e-10,
+            0.000207
+        ],
+        "test_div_threshold": 0.0001,
+        "train_val_split": 1.0
+    },
+    "optional_params": {
+        "kill_tensorboard_summaries_and_checkpoints": true
+    },
+    "prediction_horizon": 1,
+    "streaming": false,
+    "train_data": "./Dataset/dataset_v06_sines_training.npz",
+    "training_data": "./Dataset/dataset_v01.npz",
+    "transfer_test_data_1": "./Dataset/dataset_v06_sines_test_transfer_1.npz",
+    "transfer_test_data_2": "./Dataset/dataset_v06_sines_test_transfer_2.npz",
+    "transfer_test_data_3": "./Dataset/dataset_v06_sines_test_transfer_3.npz",
+    "validation_data": "./Dataset/dataset_v06_sines_validation.npz"
+}

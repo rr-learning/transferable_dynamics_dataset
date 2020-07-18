@@ -1,0 +1,29 @@
+{
+    "averaging": true,
+    "history_length": 1,
+    "id": 26,
+    "iid_test_data": "./Dataset/dataset_v06_sines_test_iid.npz",
+    "mode": "train",
+    "model_arch_params": {
+        "activation": "relu",
+        "num_layers": 2,
+        "num_units": 256
+    },
+    "model_dir": "./Results/NN",
+    "model_train_params": {
+        "batch_size": 512,
+        "epochs": 40,
+        "l2_reg": 0.01,
+        "learning_rate": 0.0001,
+        "loss": "mse",
+        "optimizer": "Adam",
+        "validation_split": 0.0
+    },
+    "prediction_horizon": 1,
+    "streaming": false,
+    "training_data": "./Dataset/dataset_v06_sines_training.npz",
+    "transfer_test_data_1": "./Dataset/dataset_v06_sines_test_transfer_1.npz",
+    "transfer_test_data_2": "./Dataset/dataset_v06_sines_test_transfer_2.npz",
+    "transfer_test_data_3": "./Dataset/dataset_v06_sines_test_transfer_3.npz",
+    "validation_data": "./Dataset/dataset_v06_sines_validation.npz"
+}
