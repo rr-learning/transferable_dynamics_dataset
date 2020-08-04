@@ -86,6 +86,20 @@ python -m DL.evaluation.evaluation \
 
 Among the implemented methods we have `SVGPR`, `system_id`, `NN`, etc.
 
+### Dependencies
+
+All dependencies are tracked using [Pipenv](https://github.com/pypa/pipenv). In order to reproduce our Python environment with all dependencies type the following command in this project's directory (transferable_dynamics_dataset):
+
+```
+pipenv install
+```
+
+After this the virtual environment can be activated by typing:
+
+```
+pipenv shell
+```
+
 ## Paper & Reference
 
 [Preprint.](https://www.is.mpg.de/uploads_file/attachment/attachment/589/ICRA20_1157_FI.pdf)

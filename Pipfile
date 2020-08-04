@@ -1,0 +1,32 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+numpy = "*"
+Keras = "*"
+tensorflow = "*"
+eql = {editable = true,git = "https://github.com/martius-lab/EQL_Tensorflow.git", ref = "EQL0"}
+l0-regularization = {git = "https://github.com/martius-lab/L0-regularization.git", editable = true}
+ipdb = "*"
+matplotlib = "*"
+pandas = "*"
+gitpython = "*"
+mujoco-py = "==2.0.2.0"
+gym = "==0.12.0"
+pipenv = "*"
+graphviz = "==0.10.1"
+gpflow = "*"
+pilco = {git = "https://github.com/DiegoAE/PILCO.git",editable = true}
+sklearn = "*"
+jupyter = "*"
+torch = "*"
+lwpr = {git = "https://github.com/DiegoAE/lwpr.git",editable = true}
+
+[requires]
+python_version = "3.6"
+
+[scripts]
