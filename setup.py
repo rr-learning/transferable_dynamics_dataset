@@ -13,10 +13,11 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/rr-learning/transferable_dynamics_dataset",
-    packages=setuptools.find_packages(),
+    packages=find_packages(exclude=("tests",)),
     install_requires=[
         'numpy',
         'matplotlib',
+        'sklearn',
     ],
     python_requires='>=3.6',
 )
