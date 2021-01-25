@@ -12,16 +12,16 @@ The data was recorded on a 3-DOF torque-controlled real-robotic system. Please c
 
 All the dataset files can be downloaded from [here](https://owncloud.tuebingen.mpg.de/index.php/s/3THSfyBgFrYykPc?path=%2F)
 
-We use the aforementioned robotic platform to record different datasets under substantially different conditions in order to assess the predictive performance of dynamics learning algorithms beyond the iid. setting. In this study such conditions are in turn governed by the particular controllers used to generate the control inputs feed into the system. We consider two types of controllers according to whether or not there is a feedback control loop.
+We use the aforementioned robotic platform to record different datasets under substantially different conditions in order to assess the predictive performance of dynamics learning algorithms beyond the iid. setting. In this study such conditions are in turn governed by the particular controllers used to generate the control inputs feed into the system. We consider two types of controllers depending on whether there is a feedback control loop or not.
 
 ### Closed-loop dataset - Sine waves PD control
 
-This dataset was generated using a superposition of sine waves to generate trajectories that were subsequently tracked by the robot using PD position control (Please refer to the paper for details). Some sampled robot movements under the 4 different families of controllers considered in the closed-loop dataset:
+This dataset was generated using a superposition of sine waves to generate trajectories that were subsequently tracked by the robot using PD position control (Please refer to the paper for details). Check out some sampled robot movements under the 4 different families of controllers considered in the closed-loop dataset:
 
 <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/1.gif" width="435"/><img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/3.gif" width="435"/>
 <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/2.gif" width="435"/><img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/4.gif" width="435"/>
 
-The shown movements are arranged according to the following diagram where each of the datasets *D* account for a particular configuration of sine angular frenquencies (low, high) and reachable task space (left, full). The arrows denote different transfer settings, which are discussed in our paper.
+The shown movements are arranged according to the following diagram where each of the datasets *D* account for a particular configuration of sine angular frenquencies (low, high) and reachable task space (left, full). The arrows denote the different transfer settings that are discussed in our paper.
 
 <p align="center">
   <img src="https://github.com/rr-learning/transferable_dynamics_dataset/blob/master/img/datasets_closed_loop.png"/>
@@ -33,7 +33,7 @@ We used sampled trajectories from a Gaussian process (GP) directly as torque inp
 
 ### Dataset structure and naming convention.
 
-The released files of the open-loop dataset are named according to the following convention:
+The released files of the closed-loop dataset are named according to the following convention:
 * `Sines_full.npz`
 * `Sines_training.npz`
 * `Sines_validation.npz`
@@ -84,7 +84,7 @@ python -m DL.evaluation.evaluation \
 --output_errors errors.npz
 ```
 
-Among the implemented methods we have `SVGPR`, `system_id`, `NN`, etc.
+Among the implemented methods we have Gaussian Processes (`SVGPR`), System Identification methods (`system_id`), Neural networks `NN`, etc.
 
 ### Dependencies
 
