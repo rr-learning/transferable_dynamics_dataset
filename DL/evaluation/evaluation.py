@@ -290,8 +290,7 @@ def run(parser):
     if arguments.output_errors:
         np.savez(arguments.output_errors, **set_to_errors)
 
-
-if __name__ == "__main__":
+def main():
     run(parser=argparse.ArgumentParser(description=__doc__))
 
     # import ipdb
@@ -303,3 +302,6 @@ if __name__ == "__main__":
     #     _, _, tb = sys.exc_info()
     #     ipdb.post_mortem(tb)
 
+
+if __name__ == "__main__":
+    main()

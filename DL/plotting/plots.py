@@ -1,14 +1,12 @@
 """
 Box plotting of multiple error files.
 """
-import ipdb
 import argparse
 import itertools
 import os
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from collections import defaultdict
 from DL.evaluation.evaluation import get_angle_errors, \
     compute_RMSE_from_errors, get_evaluation_errors
@@ -120,8 +118,7 @@ def aggregated_plot(RMSEs,
             fig.savefig(os.path.join(path_to_plots_folder, "RMSEs.pdf"))
             fig.savefig(os.path.join(path_to_plots_folder, "RMSEs.png"))
 
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--error_files", required=True, nargs='+',
             help="Filename of the error files to plot")
@@ -130,3 +127,7 @@ if __name__ == "__main__":
     parser.add_argument("--violinplot", action='store_true')
     args = parser.parse_args()
     box_violin_plot(args.error_files, args.names, args.violinplot)
+
+
+if __name__ == "__main__":
+    main()

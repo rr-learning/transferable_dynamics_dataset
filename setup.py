@@ -14,6 +14,12 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/rr-learning/transferable_dynamics_dataset",
     packages=setuptools.find_packages(include=['DL', 'DL.*']),
+    entry_points={
+        'console_scripts': [
+            'compute_errors=DL.evaluation.evaluation:main',
+            'plot_errors=DL.plotting.plots:main',
+        ],
+    },
     install_requires=[
         'numpy',
         'matplotlib',
