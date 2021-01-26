@@ -1,14 +1,12 @@
 """
 Box plotting of multiple error files.
 """
-import ipdb
 import argparse
 import itertools
 import os
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from collections import defaultdict
 from DL.evaluation.evaluation import get_angle_errors, \
     compute_RMSE_from_errors, get_evaluation_errors
