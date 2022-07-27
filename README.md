@@ -10,7 +10,7 @@ The data was recorded on a 3-DOF torque-controlled real-robotic system. Please c
 
 ## Robotic dataset
 
-All the dataset files can be downloaded from [here](https://owncloud.tuebingen.mpg.de/index.php/s/3THSfyBgFrYykPc?path=%2F)
+All the dataset files can be downloaded from [here](https://edmond.mpdl.mpg.de/dataset.xhtml?persistentId=doi:10.17617/3.ZT6K7P) or alternatively from [here](https://owncloud.tuebingen.mpg.de/index.php/s/3THSfyBgFrYykPc?path=%2F)
 
 We use the aforementioned robotic platform to record different datasets under substantially different conditions in order to assess the predictive performance of dynamics learning algorithms beyond the iid. setting. In this study such conditions are in turn governed by the particular controllers used to generate the control inputs feed into the system. We consider two types of controllers depending on whether there is a feedback control loop or not.
 
